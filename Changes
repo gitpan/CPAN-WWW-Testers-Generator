@@ -1,0 +1,16 @@
+Revision history for Perl module CPAN::WWW::Testers::Generator.
+
+0.20 Wed Aug 13 21:52:06 BST 2003
+	- make sure to HTML escape everything
+	- design update, now with CSS
+	- Fix bug where reports are use A/AM/AMS/Crypt-TEA-1.22.tar.gz
+	  instead of Crypt-TEA-1.22.tar.gz
+	- added a TODO
+	- sort using version, not Sort::Version
+	- renamed to CPAN::WWW::Testers::Generator
+	- included HISTORY section by Elaine Ashton
+	- moved examples/generate.pl to an installed script,
+	  bin/cpan_www_testers_generate
+
+0.10 Thu Jul 31 23:09:25 BST 2003
+	- initial release

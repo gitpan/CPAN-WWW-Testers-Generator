@@ -1,0 +1,64 @@
+NAME
+    CPAN::WWW::Testers::Generator - Download and summarize CPAN Testers data
+
+SYNOPSIS
+      % cpan_www_testers_generate
+      # ... wait patiently for about 30 mins
+      # ... then use testers.db, an SQLite database
+
+DESCRIPTION
+    The distribution can download and summarize CPAN Testers data.
+    cpan-testers is a group which was initially setup by Graham Barr and
+    Chris Nandor. The objective of the group is to test as many of the
+    distributions on CPAN as possible, on as many platforms as possible. The
+    ultimate goal is to improve the portability of the distributions on
+    CPAN, and provide good feedback to the authors.
+
+    CPAN Testers is really a mailing list with a web interface,
+    testers.cpan.org. testers.cpan.org was painfully slow. I happened to be
+    doing metadata stuff for Module::CPANTS. This is the result.
+
+    This module downloads the cpan-testers newsgroup, and then generates an
+    SQLite database containing all the most important information. You can
+    then query this database, or use CPAN::WWW::Testers to present it over
+    the web.
+
+    A good example query for Acme-Colour would be:
+
+      SELECT version, action, count(*) FROM reports WHERE 
+      dist = 'Acme-Colour' GROUP BY version, action;
+
+    It takes about 30 minutes to generate the database file. If you don't
+    want to generate the database yourself, I am releasing daily copies of
+    it at http://testers.astray.com/testers.db
+
+HISTORY
+    The CPAN testers was conceived back in May 1998 by Graham Barr and Chris
+    Nandor as a way to provide multi-platform testing for modules. Today
+    there are over 68,000 tester reports and more than 400 testers giving
+    valuable feedback for users and authors alike.
+
+BECOME A TESTER
+    Whether you have a common platform or a very unusual one, you can help
+    by testing modules you install and submitting reports. There are plenty
+    of module authors who could use test reports and helpful feedback on
+    their modules and distributions. If you'd like to get involved, please
+    take a look at
+
+    Test::Reporter http://search.cpan.org/author/FOX/Test-Reporter-1.20/,
+
+    CPANPLUS
+    http://search.cpan.org/author/KANE/CPANPLUS-0.042/lib/CPANPLUS/TesterGui
+    de.pod,
+
+    the cpan-testers mailing list
+    http://lists.cpan.org/showlist.cgi?name=cpan-testers
+
+    and start submitting your reports.
+
+AUTHOR
+    Leon Brocard <leon@astray.com>
+
+LICENSE
+    This code is distributed under the same license as Perl.
+

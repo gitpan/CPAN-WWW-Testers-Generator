@@ -1,0 +1,12 @@
+#!/usr/bin/perl -w
+use strict;
+use Cwd;
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+use CPAN::WWW::Testers::Generator;
+
+my $directory = cwd();
+
+my $t = CPAN::WWW::Testers::Generator->new();
+$t->directory($directory);
+$t->generate;

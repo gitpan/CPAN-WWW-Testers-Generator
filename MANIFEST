@@ -1,0 +1,8 @@
+Build.PL
+Changes
+MANIFEST			This list of files
+META.yml
+README
+TODO
+bin/cpan_www_testers_generate
+lib/CPAN/WWW/Testers/Generator.pm
