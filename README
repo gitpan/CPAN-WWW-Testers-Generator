@@ -3,7 +3,7 @@ NAME
 
 SYNOPSIS
       % cpan_www_testers_generate
-      # ... wait patiently for about 30 mins
+      # ... wait patiently for about an hour
       # ... then use testers.db, an SQLite database
 
 DESCRIPTION
@@ -25,17 +25,39 @@ DESCRIPTION
 
     A good example query for Acme-Colour would be:
 
-      SELECT version, action, count(*) FROM reports WHERE 
-      dist = 'Acme-Colour' GROUP BY version, action;
+      SELECT version, status, count(*) FROM reports WHERE
+      distribution = "Acme-Colour" group by version, status;
 
-    It takes about 30 minutes to generate the database file. If you don't
-    want to generate the database yourself, I am releasing daily copies of
-    it at http://testers.astray.com/testers.db
+    It can over an hour to generate the database file. If you don't want to
+    generate the database yourself, I am releasing daily copies of it at
+    http://testers.astray.com/testers.db
+
+INTERFACE
+  The Constructor
+    * new
+        Instatiates the object CPAN::WWW::Testers::Generator.
+
+  Methods
+    *
+    * directory
+        Accessor to set/get the directory where the news.db is to be
+        created.
+
+    * generate
+        Initiates the $obj->download and $obj->insert method calls.
+
+    * download
+        Downloads the latest article updates from the NNTP server for the
+        cpan-testers newgroup. Articles are then stored in the news.db
+        SQLite database.
+
+    * insert
+        Reads the local copy of the news.db, and creates the testers.db.
 
 HISTORY
     The CPAN testers was conceived back in May 1998 by Graham Barr and Chris
     Nandor as a way to provide multi-platform testing for modules. Today
-    there are over 68,000 tester reports and more than 400 testers giving
+    there are over 100,000 tester reports and more than 400 testers giving
     valuable feedback for users and authors alike.
 
 BECOME A TESTER
@@ -45,11 +67,10 @@ BECOME A TESTER
     their modules and distributions. If you'd like to get involved, please
     take a look at
 
-    Test::Reporter http://search.cpan.org/author/FOX/Test-Reporter-1.20/,
+    Test::Reporter http://search.cpan.org/dist/Test-Reporter/,
 
     CPANPLUS
-    http://search.cpan.org/author/KANE/CPANPLUS-0.042/lib/CPANPLUS/TesterGui
-    de.pod,
+    http://search.cpan.org/dist/CPANPLUS/lib/CPANPLUS/TesterGuide.pod,
 
     the cpan-testers mailing list
     http://lists.cpan.org/showlist.cgi?name=cpan-testers

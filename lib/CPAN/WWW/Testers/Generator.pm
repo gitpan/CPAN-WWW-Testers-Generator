@@ -1,27 +1,22 @@
 package CPAN::WWW::Testers::Generator;
+use strict;
+use CPAN::DistnameInfo;
+use CPAN::WWW::Testers::Generator::Article;
 use DBI;
 use Email::Simple;
 use File::Spec::Functions;
 use Mail::Address;
 use Net::NNTP;
-use strict;
+use base qw(Class::Accessor::Fast);
+__PACKAGE__->mk_accessors(qw(directory));
 use vars qw($VERSION);
 use version;
-$VERSION = "0.21";
+$VERSION = "0.22";
 
 sub new {
   my $class = shift;
   my $self = {};
   bless $self, $class;
-}
-
-sub directory {
-  my($self, $dir) = @_;
-  if (defined $dir) {
-    $self->{DIR} = $dir;
-  } else {
-    return $self->{DIR};
-  }
 }
 
 sub generate {
@@ -31,34 +26,42 @@ sub generate {
   $self->insert;
 }
 
+sub _dbh {
+  my $self = shift;
+  my $name = shift;
+
+  my $directory = $self->directory;
+  my $dsn = "DBI:SQLite:dbname=$directory/$name.db";
+  my $dbh = DBI->connect($dsn, "", "", {
+    RaiseError => 1,
+    AutoCommit => 0,
+    sqlite_handle_binary_nulls => 1,
+  });
+
+  return $dbh;
+}
+
 sub download {
   my $self = shift;
+  my $dbh  = $self->_dbh("news");
 
-  my $dbname = "news.db";
-  my $db_exists = -f catfile($self->directory, $dbname);
-  my $dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1, AutoCommit => 1});
-  $dbh->do("PRAGMA default_synchronous = OFF");
-
-  unless ($db_exists) {
-    $dbh->do("
+  eval { $dbh->do("
 CREATE TABLE articles (
- id INTEGER, 
- article TEXT,
- unique(id)
-)");
-  }
-
-  # Right, let's use transactions for speed
-  $dbh->{AutoCommit} = 0;
-  $dbh->{sqlite_handle_binary_nulls} = 1;
-
+ id INTEGER PRIMARY KEY,  
+ article TEXT
+)"); };
+  die $@ if $@ && $@ !~ /table articles already exists/;
+  
   my $sth = $dbh->prepare("SELECT max(id) from articles");
   $sth->execute;
   my($max_id) = $sth->fetchrow_array || 0;
 
   $sth = $dbh->prepare("INSERT INTO articles VALUES (?, ?)");
 
-  my $nntp = Net::NNTP->new("nntp.perl.org") || die;
+  my $exists_sth = $dbh->prepare("SELECT id FROM articles WHERE id = ?");
+
+  my $nntp = Net::NNTP->new("nntp.perl.org") 
+	  || die "Cannot connect to nntp.perl.org";
   my($num, $first, $last) = $nntp->group("perl.cpan.testers");
 
   my $count;
@@ -79,93 +82,62 @@ CREATE TABLE articles (
 
 sub insert {
   my $self = shift;
+  my $dbh  = $self->_dbh("testers");
 
-  my $dbname = "news.db";
-  my $article_dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1 });
-  $article_dbh->{sqlite_handle_binary_nulls} = 1;
-  my $article_sth = $article_dbh->prepare("SELECT id, article from articles");
-  $article_sth->execute;
+  my @fields = qw(status distribution version perl osname osvers archname);
 
-  $dbname = "testers.db";
-  my $db_exists = -f catfile($self->directory, $dbname);
-  my $dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1, AutoCommit => 1});
-  $dbh->do("PRAGMA default_synchronous = OFF");
-
-  unless ($db_exists) {
+  eval {
     $dbh->do("
 CREATE TABLE reports (
- id INTEGER, action, distversion, dist, version, platform,
- unique(id)
+  id INTEGER PRIMARY KEY,
+  status TEXT,
+  distribution TEXT,
+  version TEXT,
+  perl TEXT,
+  osname TEXT,
+  osvers TEXT,
+  archname TEXT
 )");
-    $dbh->do("CREATE INDEX action_idx on reports (action)");
-    $dbh->do("CREATE INDEX dist_idx on reports (dist)");
-    $dbh->do("CREATE INDEX version_idx on reports (version)");
-    $dbh->do("CREATE INDEX distversion_idx on reports (version)");
-    $dbh->do("CREATE INDEX platform_idx on reports (platform)");
-  }
 
-  # Right, let's use transactions for speed
-  $dbh->{AutoCommit} = 0;
-  $dbh->{sqlite_handle_binary_nulls} = 1;
+    foreach my $field (@fields) {
+      $dbh->do("CREATE INDEX ${field}_idx on reports (${field})");
+    }
+ };
+  die $@ if $@ && $@ !~ /table reports already exists/;
 
-  my $sth = $dbh->prepare("REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?)");
+  my $sth = $dbh->prepare("SELECT max(id) from reports");
+  $sth->execute;
+  my($max_id) = $sth->fetchrow_array || 0;
 
-  my $count = 0;
+  my $news_dbh = $self->_dbh("news");
+  my $article_sth = $news_dbh->prepare("SELECT id, article from articles WHERE id > ?");
+  $article_sth->execute($max_id);
+
+  $sth = $dbh->prepare("REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+
+  my $count = $max_id;
   while (my($id, $content) = $article_sth->fetchrow_array) {
-    if (($count++ % 1000) == 0) {
+    if ((++$count % 1000) == 0) {
       print "$count...";
       $dbh->commit;
       print "\n";
     }
 
-    my $mail = Email::Simple->new($content);
-    my $subject = $mail->header("Subject");
-    next unless $subject;
-    next if $subject =~ /::/; # it's supposed to be distribution
-    my($action, $distversion, $platform) = split /\s/, $subject;
-    next unless defined $action;
-    next unless $action =~ /^PASS|FAIL|UNKNOWN|NA$/;
-    # Fix bug where reports are like A/AM/AMS/Crypt-TEA-1.22.tar.gz
-    $distversion =~ s{^.+/}{};
-    $distversion =~ s/\.tar\.gz$//;
-    $distversion =~ s/\.zip$//;
-    $distversion =~ s/\.tgz$//;
-    my ($dist, $version) = $self->extract_name_version($distversion);
-    next unless $version;
-    $sth->execute($id, $action, $distversion, $dist, $version, $platform);
+    my $article = CPAN::WWW::Testers::Generator::Article->new(\$content);
+    next unless $article;
+
+    my @values;
+    foreach my $field (@fields) {
+      push @values, $article->$field;
+    }
+
+    $sth->execute($id, @values);
   }
   $dbh->commit;
   $dbh->disconnect;
+  $news_dbh->disconnect;
 }
 
-# from TUCS, coded by gbarr
-sub extract_name_version {
-  my($self, $file) = @_;
-
-  my ($dist, $version) = $file =~ /^
-    ((?:[-+.]*(?:[A-Za-z0-9]+|(?<=\D)_|_(?=\D))*
-      (?:
-   [A-Za-z](?=[^A-Za-z]|$)
-   |
-   \d(?=-)
-     )(?<![._-][vV])
-    )+)(.*)
-  $/xs or return ($file);
-
-  $version = $1
-    if !length $version and $dist =~ s/-(\d+\w)$//;
-
-  $version = $1 . $version
-    if $version =~ /^\d+$/ and $dist =~ s/-(\w+)$//;
-
-     if ($version =~ /\d\.\d/) {
-    $version =~ s/^[-_.]+//;
-  }
-  else {
-    $version =~ s/^[-_]+//;
-  }
-  return ($dist, $version);
-}
 
 1;
 
@@ -178,7 +150,7 @@ CPAN::WWW::Testers::Generator - Download and summarize CPAN Testers data
 =head1 SYNOPSIS
 
   % cpan_www_testers_generate
-  # ... wait patiently for about 30 mins
+  # ... wait patiently for about an hour
   # ... then use testers.db, an SQLite database
 
 =head1 DESCRIPTION
@@ -201,18 +173,56 @@ over the web.
 
 A good example query for Acme-Colour would be:
 
-  SELECT version, action, count(*) FROM reports WHERE 
-  dist = 'Acme-Colour' GROUP BY version, action;
+  SELECT version, status, count(*) FROM reports WHERE
+  distribution = "Acme-Colour" group by version, status;
 
-It takes about 30 minutes to generate the database file. If you don't
-want to generate the database yourself, I am releasing daily copies of
-it at http://testers.astray.com/testers.db
+It can over an hour to generate the database file. If you don't want to
+generate the database yourself, I am releasing daily copies of it at 
+http://testers.astray.com/testers.db
+
+=head1 INTERFACE
+
+=head2 The Constructor
+
+=over
+
+=item * new
+
+Instatiates the object CPAN::WWW::Testers::Generator.
+
+=back
+
+=head2 Methods
+
+=over
+
+=item 
+
+=item * directory
+
+Accessor to set/get the directory where the news.db is to be created.
+
+=item * generate
+
+Initiates the $obj->download and $obj->insert method calls.
+
+=item * download
+
+Downloads the latest article updates from the NNTP server for the
+cpan-testers newgroup. Articles are then stored in the news.db
+SQLite database.
+
+=item * insert
+
+Reads the local copy of the news.db, and creates the testers.db.
+
+=back
 
 =head1 HISTORY
 
 The CPAN testers was conceived back in May 1998 by Graham Barr and 
 Chris Nandor as a way to provide multi-platform testing for modules.
-Today there are over 68,000 tester reports and more than 400 testers 
+Today there are over 100,000 tester reports and more than 400 testers 
 giving valuable feedback for users and authors alike.
 
 =head1 BECOME A TESTER
@@ -224,10 +234,10 @@ modules and distributions. If you'd like to get involved, please take a
 look at
 
 Test::Reporter 
-http://search.cpan.org/author/FOX/Test-Reporter-1.20/, 
+http://search.cpan.org/dist/Test-Reporter/, 
 
 CPANPLUS
-http://search.cpan.org/author/KANE/CPANPLUS-0.042/lib/CPANPLUS/TesterGuide.pod,
+http://search.cpan.org/dist/CPANPLUS/lib/CPANPLUS/TesterGuide.pod,
  
 the cpan-testers mailing list 
 http://lists.cpan.org/showlist.cgi?name=cpan-testers 

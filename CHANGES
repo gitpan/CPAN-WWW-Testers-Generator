@@ -1,5 +1,15 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.22 Thu Feb  3 15:27:41 GMT 2005
+	- now includes perl + OS version in the testers.db
+	- use SQLite 3.0
+	- bin/cpan_www_testers_generate expanded to give more
+	  flexibility for execution
+	- added Makefile.PL (as per TODO)
+	- added tests
+	- added more POD
+	- (thanks to Barbie)
+
 0.21 Sun Mar  7 18:31:35 GMT 2004
 	- the NNTP cache now uses SQLite instead of DB_File
 	- rename Changes to CHANGES
