@@ -1,5 +1,4 @@
 package CPAN::WWW::Testers::Generator;
-use DB_File;
 use DBI;
 use Email::Simple;
 use File::Spec::Functions;
@@ -8,7 +7,7 @@ use Net::NNTP;
 use strict;
 use vars qw($VERSION);
 use version;
-$VERSION = "0.20";
+$VERSION = "0.21";
 
 sub new {
   my $class = shift;
@@ -35,30 +34,61 @@ sub generate {
 sub download {
   my $self = shift;
 
-  my $t = tie my %testers,  'DB_File', catfile($self->directory, "testers.dbm");
+  my $dbname = "news.db";
+  my $db_exists = -f catfile($self->directory, $dbname);
+  my $dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1, AutoCommit => 1});
+  $dbh->do("PRAGMA default_synchronous = OFF");
+
+  unless ($db_exists) {
+    $dbh->do("
+CREATE TABLE articles (
+ id INTEGER, 
+ article TEXT,
+ unique(id)
+)");
+  }
+
+  # Right, let's use transactions for speed
+  $dbh->{AutoCommit} = 0;
+  $dbh->{sqlite_handle_binary_nulls} = 1;
+
+  my $sth = $dbh->prepare("SELECT max(id) from articles");
+  $sth->execute;
+  my($max_id) = $sth->fetchrow_array || 0;
+
+  $sth = $dbh->prepare("INSERT INTO articles VALUES (?, ?)");
+
   my $nntp = Net::NNTP->new("nntp.perl.org") || die;
   my($num, $first, $last) = $nntp->group("perl.cpan.testers");
 
   my $count;
-  foreach my $id ($first .. $last) {
-    next if exists $testers{$id};
+  foreach my $id ($max_id+1 .. $last) {
     print "[$id .. $last]\n";
     my $article = join "", @{$nntp->article($id) || []};
-    $testers{$id} = $article;
-    if (($count++ % 100) == 0) {
+    $sth->execute($id, $article);
+    if ((++$count % 50) == 0) {
       print "[syncing]\n";
-      $t->sync;
+      $dbh->commit;
     }
   }
+
+  $dbh->commit;
+  $dbh->disconnect;
 }
 
 
 sub insert {
   my $self = shift;
-  tie my %testers,  'DB_File', catfile($self->directory, "testers.dbm") || die;
 
-  my $db_exists = -f catfile($self->directory, 'testers.db');
-  my $dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, "testers.db"),"","", { RaiseError => 1, AutoCommit => 1});
+  my $dbname = "news.db";
+  my $article_dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1 });
+  $article_dbh->{sqlite_handle_binary_nulls} = 1;
+  my $article_sth = $article_dbh->prepare("SELECT id, article from articles");
+  $article_sth->execute;
+
+  $dbname = "testers.db";
+  my $db_exists = -f catfile($self->directory, $dbname);
+  my $dbh = DBI->connect("dbi:SQLite:dbname=" . catfile($self->directory, $dbname),"","", { RaiseError => 1, AutoCommit => 1});
   $dbh->do("PRAGMA default_synchronous = OFF");
 
   unless ($db_exists) {
@@ -76,11 +106,12 @@ CREATE TABLE reports (
 
   # Right, let's use transactions for speed
   $dbh->{AutoCommit} = 0;
+  $dbh->{sqlite_handle_binary_nulls} = 1;
 
   my $sth = $dbh->prepare("REPLACE INTO reports VALUES (?, ?, ?, ?, ?, ?)");
 
   my $count = 0;
-  while (my($id, $content) = each %testers) {
+  while (my($id, $content) = $article_sth->fetchrow_array) {
     if (($count++ % 1000) == 0) {
       print "$count...";
       $dbh->commit;

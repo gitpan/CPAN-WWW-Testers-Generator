@@ -1,5 +1,9 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.21 Sun Mar  7 18:31:35 GMT 2004
+	- the NNTP cache now uses SQLite instead of DB_File
+	- rename Changes to CHANGES
+
 0.20 Wed Aug 13 21:52:06 BST 2003
 	- make sure to HTML escape everything
 	- design update, now with CSS

@@ -1,21 +1,20 @@
 --- #YAML:1.0
 name: CPAN-WWW-Testers-Generator
-version: 0.20
+version: 0.21
+author:
+  - Leon Brocard <leon@astray.com>
+abstract: Download and summarize CPAN Testers data
 license: perl
-distribution_type: module
 requires:
-  DBD::SQLite: 0.01
-  DB_File: 0.01
-  DateTime: 0.01
-  Email::Simple: 0.01
-  Mail::Address: 0.01
-  Net::NNTP: 0.01
-  Test::More: 0.01
-recommends: {}
-build_requires: {}
-conflicts: {}
+  DBD::SQLite: 0
+  DateTime: 0
+  Email::Simple: 0
+  Mail::Address: 0
+  Net::NNTP: 0
+  Test::More: 0
+  version: 0
 provides:
   CPAN::WWW::Testers::Generator:
     file: lib/CPAN/WWW/Testers/Generator.pm
-    version: 0.20
-generated_by: Module::Build version 0.19
+    version: 0.21
+generated_by: Module::Build version 0.24
