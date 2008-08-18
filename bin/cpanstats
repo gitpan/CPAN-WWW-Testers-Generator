@@ -1,0 +1,92 @@
+#!/usr/bin/perl -w
+use strict;
+
+#----------------------------------------------------------------------------
+# Library Modules
+
+use lib qw(../lib lib);
+
+use CPAN::WWW::Testers::Generator   "0.23";
+use Cwd;
+use Getopt::Long;
+
+#----------------------------------------------------------------------------
+# Variables
+
+my ($opt_d, $opt_h, $opt_i);
+
+#----------------------------------------------------------------------------
+# Code
+
+GetOptions(
+    'directory|d=s' => \$opt_d,
+    'ignore|i'      => \$opt_i,
+    'help|h'        => \$opt_h,
+);
+
+if ( $opt_h ) {
+    print <<HERE;
+Usage: $0 [-d directory] [-h]
+  -d directory   use named directory
+  -i             ignore no article errors
+  -h             this help screen
+HERE
+    exit 1;
+}
+
+my $directory = $opt_d || cwd();
+my $t = CPAN::WWW::Testers::Generator->new(
+    ignore      => $opt_i,
+    directory   => $directory,
+    logfile     => $directory . '/logs/cpanstats.log'
+);
+
+$t->generate;
+
+__END__
+
+=head1 NAME
+
+cpanstats - script to access the NNTP server and update the database.
+
+=head1 SYNOPSIS
+
+  cpanstats
+
+=head1 DESCRIPTION
+
+Acts as a wrapper script to the underlying CPAN::WWW::Testers::Generator code
+that downloads articles from the NNTP server, extracts all components of each,
+then stores the data into a local SQLite database.
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties, that is not explained within the POD
+documentation, please send an email to barbie@cpan.org. However, it would help
+greatly if you are able to pinpoint problems or even supply a patch.
+
+Fixes are dependant upon their severity and my availablity. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+=head1 SEE ALSO
+
+L<CPAN::WWW::Testers>.
+
+F<http://www.cpantesters.org/>,
+F<http://stats.cpantesters.org/>.
+
+=head1 AUTHOR
+
+  Barbie, <barbie@cpan.org>
+  for Miss Barbell Productions <http://www.missbarbell.co.uk>.
+
+=head1 COPYRIGHT AND LICENSE
+
+  Copyright (C) 2005-2008 Barbie for Miss Barbell Productions.
+
+  This module is free software; you can redistribute it and/or
+  modify it under the same terms as Perl itself.
+
+=cut
+

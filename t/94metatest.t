@@ -4,7 +4,8 @@ use Test::More;
 plan skip_all => "Author tests not required for installation"
     unless ( $ENV{AUTOMATED_TESTING} );
 
-eval "use Test::Pod 1.00";
-plan skip_all => "Test::Pod 1.00 required for testing POD" if $@;
-all_pod_files_ok();
+eval "use Test::CPAN::Meta 0.12";
+plan skip_all => "Test::CPAN::Meta 0.12 required for testing META.yml" if $@;
+meta_yaml_ok();
+
 

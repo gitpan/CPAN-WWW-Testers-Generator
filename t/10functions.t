@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
-use Test::More tests => 8;
+use Test::More tests => 20;
 use CPAN::WWW::Testers::Generator;
 
 my @perls = (
@@ -29,7 +29,7 @@ my @perls = (
 my $t = CPAN::WWW::Testers::Generator->new();
 isa_ok($t,'CPAN::WWW::Testers::Generator');
 
-is($t->directory,undef);
+is($t->directory,'.');
 is($t->directory('here'),'here');
 is($t->directory,'here');
 
@@ -41,4 +41,18 @@ foreach (@perls) {
   is($version, $perl);
 }
 
-# generate, download & insert are not tested
+my @testdates = (
+    ['Wed, 13 September 2004','200409','200409130000'],
+    ['13 September 2004','200409','200409130000'],
+    ['September 22, 1999 06:29','199909','199909220629'],
+
+    ['Wed, 13 September 1990','000000','000000000000'],
+    ['13 September 1990','000000','000000000000'],
+    ['September 22, 1990 06:29','000000','000000000000'],
+);
+
+for my $row (@testdates) {
+    my ($d1,$d2) = CPAN::WWW::Testers::Generator::Article::_extract_date($row->[0]);
+    is($d1,$row->[1],".. short date parse of '$row->[0]'");
+    is($d2,$row->[2],".. long date parse of '$row->[0]'");
+}
