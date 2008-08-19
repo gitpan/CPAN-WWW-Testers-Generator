@@ -1,0 +1,148 @@
+#!/usr/bin/perl
+use strict;
+$|++;
+
+my $VERSION = '0.09';
+
+#----------------------------------------------------------------------------
+
+=head1 NAME
+
+delstats.pl - script to delete entries from the cpanstats database.
+
+=head1 SYNOPSIS
+
+  perl delstats.pl [-a=0] [-d=0] [--database=$db] [--file=$file]
+
+=head1 DESCRIPTION
+
+Using the cpanstats database, which should in the local directory, extracts
+all the data into the components of each page. Creates the graphs, then
+creates each HTML page of the site.
+
+=head1 OPTIONS
+
+=over 4
+
+=item -a | --all
+
+Delete all the NNTP ids greater than the specified number.
+
+=item -d | --delete
+
+Delete a single NNTP id.
+
+=item --database
+
+Specify the exact path to the cpanstats database if not ./cpanstats.db.
+
+=item --file
+
+Named file used when deleting a list of NNTP ids.
+
+=back
+
+=cut
+
+# -------------------------------------
+# Library Modules
+
+use DBI;
+use Getopt::Long;
+use IO::File;
+
+Use CPAN::WWW::Testers::Generator::Database;
+
+# -------------------------------------
+# Variables
+
+use constant    DATABASE    => 'cpanstats.db';
+
+my (%options);
+
+# -------------------------------------
+# Program
+
+##### INITIALISE #####
+
+GetOptions( \%options,
+            "all|a=i",
+            "delete|d=i",
+            "database=s",
+            "file=s"
+);
+
+$options{database} ||= DATABASE;
+
+my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
+print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
+
+
+##### MAIN #####
+
+my @list = get_list();
+for my $id (@list) {
+	print "Deleting ... $id\n";
+	$dbi->do_query("DELETE from cpanstats WHERE id=$id");
+}
+
+do_query("DELETE from cpanstats WHERE id>$options{all}")	if($options{all});
+do_query("DELETE from cpanstats WHERE id=$options{delete}")	if($options{delete});
+
+# -------------------------------------
+# Subroutines
+
+=item get_list
+
+Returns the list of NNTP ids from the named file.
+
+=cut
+
+sub get_list {
+	my @list;
+	my $file = $options{file} || return ();
+	die "file [$file] not found"	unless(-f $file);
+
+	my $fh = IO::File->new($file)	or die "Cannot open file [$file]: $!";
+	while(<$fh>) {
+		chomp;
+		my ($num) = (m/^(\d+)/);
+		push @list, $num	if($num);
+	}
+	$fh->close;
+	return @list;
+}
+
+__END__
+
+=back
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties, that is not explained within the POD
+documentation, please send an email to barbie@cpan.org. However, it would help
+greatly if you are able to pinpoint problems or even supply a patch. 
+
+Fixes are dependant upon their severity and my availablity. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+=head1 SEE ALSO
+
+F<http://www.cpantesters.org/>,
+F<http://stats.cpantesters.org/>
+
+=head1 AUTHOR
+
+  Barbie, <barbie@cpan.org>
+  for Miss Barbell Productions <http://www.missbarbell.co.uk>.
+
+=head1 COPYRIGHT AND LICENSE
+
+  Copyright (C) 2005-2008 Barbie for Miss Barbell Productions.
+
+  This module is free software; you can redistribute it and/or 
+  modify it under the same terms as Perl itself.
+
+=cut
+

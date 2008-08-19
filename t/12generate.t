@@ -33,7 +33,7 @@ my %articles = (
 );
 
 SKIP: {
-    skip "Test::MockObject required for testing", 6 if $nomock;
+    skip "Test::MockObject required for testing", 11 if $nomock;
 
     my $directory = cwd();
     rmtree($directory . '/logs');

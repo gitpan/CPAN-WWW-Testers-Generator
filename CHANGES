@@ -1,5 +1,14 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.24	19/08/2008
+	- added bin/readstats (v0.16), bin/delstats (v0.09),
+          bin/selectstats (v0.05) and bin/upstats (v0.03) from the non-CPAN
+          cpanstats distribution.
+        - updated all scripts to use an options hash rather than individual
+          variables.
+        - added new Database.pm module to handle all local DB interaction.
+        - fixed test bug in t/12generate.t (thanks to Slaven Rezic).
+
 0.23	18/08/2008
 	- new maintainer: Barbie.
 	- major overhaul to draw in CPAN Testers Statistics code.

@@ -4,8 +4,14 @@ Makefile.PL
 META.yml
 README
 bin/cpanstats
+bin/delstats
+bin/readstats
+bin/selectstats
+bin/upstats
+examples/generate.sh
 lib/CPAN/WWW/Testers/Generator.pm
 lib/CPAN/WWW/Testers/Generator/Article.pm
+lib/CPAN/WWW/Testers/Generator/Database.pm
 t/01base.t
 t/10functions.t
 t/11article.t

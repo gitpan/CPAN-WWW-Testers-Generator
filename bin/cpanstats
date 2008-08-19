@@ -1,30 +1,33 @@
 #!/usr/bin/perl -w
 use strict;
 
+my $VERSION = '0.02';
+
 #----------------------------------------------------------------------------
 # Library Modules
 
 use lib qw(../lib lib);
 
-use CPAN::WWW::Testers::Generator   "0.23";
 use Cwd;
 use Getopt::Long;
+
+use CPAN::WWW::Testers::Generator   '0.23';
 
 #----------------------------------------------------------------------------
 # Variables
 
-my ($opt_d, $opt_h, $opt_i);
+my %options;
 
 #----------------------------------------------------------------------------
 # Code
 
-GetOptions(
-    'directory|d=s' => \$opt_d,
-    'ignore|i'      => \$opt_i,
-    'help|h'        => \$opt_h,
+GetOptions( \%options,
+            'directory|d=s',
+            'ignore|i',
+            'help|h'
 );
 
-if ( $opt_h ) {
+if ( $options{help} ) {
     print <<HERE;
 Usage: $0 [-d directory] [-h]
   -d directory   use named directory
@@ -34,9 +37,9 @@ HERE
     exit 1;
 }
 
-my $directory = $opt_d || cwd();
+my $directory = $options{directory} || cwd();
 my $t = CPAN::WWW::Testers::Generator->new(
-    ignore      => $opt_i,
+    ignore      => $options{ignore},
     directory   => $directory,
     logfile     => $directory . '/logs/cpanstats.log'
 );

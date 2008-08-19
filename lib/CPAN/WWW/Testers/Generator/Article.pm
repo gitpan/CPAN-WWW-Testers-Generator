@@ -3,7 +3,7 @@ package CPAN::WWW::Testers::Generator::Article;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "0.23";
+$VERSION = '0.24';
 
 #----------------------------------------------------------------------------
 # Library Modules
