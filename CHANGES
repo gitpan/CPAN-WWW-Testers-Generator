@@ -1,5 +1,19 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.25	28/08/2008
+	- added POD about bugs and see also sections.
+	- fixed POD in scripts.
+	- added author to upload metadata, to save lookups elsewhere.
+	- renamed several supporting scripts:
+	    delstats    => bin/cpanstats-delete (v0.10)
+	    selectstats => bin/cpanstats-select (v0.06)
+	    upstats     => bin/cpanstats-update (v0.04)
+	    readstats   => bin/cpanstats-verify (v0.17)
+	- added further functionality to cpanstats-select.
+	- added bin/cpanstats-reparse (v0.06) to distribution
+	- added nostore option to not retain old articles in the articles
+	  database.
+
 0.24	19/08/2008
 	- added bin/readstats (v0.16), bin/delstats (v0.09),
           bin/selectstats (v0.05) and bin/upstats (v0.03) from the non-CPAN

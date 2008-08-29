@@ -4,10 +4,11 @@ Makefile.PL
 META.yml
 README
 bin/cpanstats
-bin/delstats
-bin/readstats
-bin/selectstats
-bin/upstats
+bin/cpanstats-delete
+bin/cpanstats-reparse
+bin/cpanstats-select
+bin/cpanstats-update
+bin/cpanstats-verify
 examples/generate.sh
 lib/CPAN/WWW/Testers/Generator.pm
 lib/CPAN/WWW/Testers/Generator/Article.pm

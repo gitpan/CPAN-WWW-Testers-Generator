@@ -24,14 +24,16 @@ my %options;
 GetOptions( \%options,
             'directory|d=s',
             'ignore|i',
+	    'nostore|n',
             'help|h'
 );
 
 if ( $options{help} ) {
     print <<HERE;
-Usage: $0 [-d directory] [-h]
+Usage: $0 [-d directory] [-i] [-n] [-h]
   -d directory   use named directory
   -i             ignore no article errors
+  -n             do not store old articles
   -h             this help screen
 HERE
     exit 1;
@@ -40,6 +42,7 @@ HERE
 my $directory = $options{directory} || cwd();
 my $t = CPAN::WWW::Testers::Generator->new(
     ignore      => $options{ignore},
+    nostore     => $options{nostore},
     directory   => $directory,
     logfile     => $directory . '/logs/cpanstats.log'
 );

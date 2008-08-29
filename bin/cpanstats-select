@@ -2,17 +2,17 @@
 use strict;
 $|++;
 
-my $VERSION = '0.05';
+my $VERSION = '0.06';
 
 #----------------------------------------------------------------------------
 
 =head1 NAME
 
-selectstats.pl - script to select stats from the CPAN Testers Statistics database.
+cpanstats-select - select stats from the CPAN Testers Statistics database.
 
 =head1 SYNOPSIS
 
-  perl selectstats.pl               \
+  perl cpanstats-select             \
     [--database=<db>]               \
     [--nntp|-n=<nntpid>]            \
     [--disto|-m=<distname>]         \
@@ -44,10 +44,12 @@ Specify the exact path to the cpanstats database if not ./cpanstats.db.
 # -------------------------------------
 # Library Modules
 
+use lib	qw(./lib ../lib);
+
 use DBI;
 use Getopt::Long;
 
-Use CPAN::WWW::Testers::Generator::Database;
+use CPAN::WWW::Testers::Generator::Database;
 
 # -------------------------------------
 # Variables
@@ -61,17 +63,18 @@ my (%options);
 
 ##### INITIALISE #####
 
-GetOptions(
-	"database=s",
-	"nntp|n=s",
-	"distro|m=s",
-	"dist|d=s",
-	"help|h",
-	"platform|o=s",
-	"perl|p=s",
-	"tester|t=s",
-	"version|v=s",
-	"date|y=s"
+GetOptions( \%options,
+	    "database=s",
+	    "nntp|n=s",
+	    "distro|m=s",
+	    "dist|d=s",
+	    "distversion|x=s",
+	    "help|h",
+	    "platform|o=s",
+	    "perl|p=s",
+	    "tester|t=s",
+	    "version|v=s",
+	    "date|y=s"
 );
 
 $options{database} ||= DATABASE;
@@ -88,25 +91,33 @@ my $sql = "SELECT * FROM cpanstats WHERE ";
 my @where;
 
 # only one of the following at a time
-@where = ("dist like '%$options{distro}%'")         if(defined $options{distro});
-@where = ("dist='$options{dist}'")                  if(defined $options{dist});
-@where = ("id=$options{nntp}")                      if(defined $options{nntp});
+@where = ("dist like '%$options{distro}%'")		if(defined $options{distro});
+@where = ("dist='$options{dist}'")			if(defined $options{dist});
+@where = ("id=$options{nntp}")				if(defined $options{nntp});
 
-push @where, "version='$options{version}'"          if(defined $options{version});
-push @where, "postdate='$options{date}'"            if(defined $options{date});
-push @where, "tester='$options{tester}'"            if(defined $options{tester});
-push @where, "platform like '$options{platform}%'"  if(defined $options{platform} && $options{platform} ne '-');
-push @where, "platform=''"                          if(defined $options{platform} && $options{platform} eq '-');
-push @where, "perl='$options{perl}'"                if(defined $options{perl} && $options{perl} ne '-');
-push @where, "perl=''"                              if(defined $options{perl} && $options{perl} eq '-');
+push @where, "version='$options{version}'"		if(defined $options{version});
+push @where, "version LIKE '%$options{distversion}%'"   if(defined $options{distversion});
+push @where, "postdate='$options{date}'"		if(defined $options{date});
+push @where, "tester LIKE '%$options{tester}%'"		if(defined $options{tester} && $options{tester} ne '-');
+push @where, "tester=''"				if(defined $options{tester} && $options{tester} eq '-');
+push @where, "platform like '$options{platform}%'"	if(defined $options{platform} && $options{platform} ne '-');
+push @where, "platform=''"				if(defined $options{platform} && $options{platform} eq '-');
+push @where, "perl='$options{perl}'"			if(defined $options{perl} && $options{perl} ne '-');
+push @where, "perl=''"					if(defined $options{perl} && $options{perl} eq '-');
 
-usage()                                             if($options{help});
+usage()							if($options{help});
 
 if(@where) {
     my @rows = $dbi->get_query($sql . join(' AND ',@where));
-    for my $row (@rows) {
-        print join(",",@$row) . "\n";
+    if(@rows) {
+        for my $row (@rows) {
+            print join(",",@$row) . "\n";
+	}
+    } else {
+        print "Sorry, no results returned\n";
     }
+} else {
+    print "No SQL arguments given\n";
 }
 
 =item usage
@@ -133,6 +144,7 @@ Notes:
     - combine options (except help) to refine your search
     - all entries (except distro and paltform) require an exact match
     - only one of nntp, dist or distro (in order of preference) is accepted
+    - use '-' for tester, perl and platform to find blank entries
 HERE
 
     exit;
@@ -147,11 +159,13 @@ __END__
 
 There are no known bugs at the time of this release. However, if you spot a
 bug or are experiencing difficulties, that is not explained within the POD
-documentation, please send an email to barbie@cpan.org. However, it would help
-greatly if you are able to pinpoint problems or even supply a patch.
+documentation, please send bug reports and patches to the RT Queue (see below).
 
 Fixes are dependant upon their severity and my availablity. Should a fix not
 be forthcoming, please feel free to (politely) remind me.
+
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 

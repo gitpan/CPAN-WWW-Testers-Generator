@@ -3,7 +3,7 @@ package CPAN::WWW::Testers::Generator::Article;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 
 #----------------------------------------------------------------------------
 # Library Modules
@@ -27,7 +27,7 @@ my %month = (
 # The Application Programming Interface
 
 __PACKAGE__->mk_accessors(qw(   postdate date status from distribution version
-                                perl osname osvers archname subject));
+                                perl osname osvers archname subject author));
 
 sub new {
     my($class, $article) = @_;
@@ -123,11 +123,12 @@ sub parse_upload {
 
     my $distvers = $1;
     # CPAN::DistnameInfo doesn't support .tar.bz2 files ... yet
-    $distvers =~ s/(\.tar)?\.t?bz2//;
-    $distvers .= '.tar.gz' unless $distvers =~ /\.(tar|tgz|zip)/;
+    $distvers =~ s/(\.tar)?\.t?bz2//i;
+    $distvers .= '.tar.gz' unless $distvers =~ /\.(tar|tgz|zip)/i;
     my $d = CPAN::DistnameInfo->new($distvers);
     $self->distribution($d->dist);
     $self->version($d->version);
+    $self->author($d->cpanid);
 
     return 1;
 }
@@ -307,6 +308,26 @@ osvers, but they are not always the same.
 Subject line of the original post.
 
 =back
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties, that is not explained within the POD
+documentation, please send bug reports and patches to the RT Queue (see below).
+
+Fixes are dependant upon their severity and my availablity. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
+
+=head1 SEE ALSO
+
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
+F<http://www.cpantesters.org/>,
+F<http://stats.cpantesters.org/>
 
 =head1 AUTHOR
 

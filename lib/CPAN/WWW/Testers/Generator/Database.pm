@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 
 #----------------------------------------------------------------------------
 
@@ -17,7 +17,7 @@ CPAN::WWW::Testers::Generator::Database - DB handling code.
   my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $db);
   my @rows = $dbi->get_query($sql);
   $dbi->do_query($sql);
-  
+
   my $iterator = $dbi->get_query_interator($sql);
   while(my $row = $iterator->()) {
     # do something
@@ -55,7 +55,7 @@ use constant    DATABASE    => 'cpanstats.db';
 =cut
 
 sub new {
-    my ($class,%hash);
+    my ($class,%hash) = @_;
     my $self = {};
     bless $self, $class;
 
@@ -85,7 +85,7 @@ An SQL wrapper method to perform a non-returning request.
 =cut
 
 sub do_query {
-    my ($self,$sql) = @_;
+    my ($self,$sql,@fields) = @_;
 
     # prepare the sql statement for executing
     my $sth = $self->{dbh}->prepare($sql);
@@ -93,7 +93,7 @@ sub do_query {
 
     # execute the SQL using any values sent to the function
     # to be placed in the sql
-    if(!$sth->execute()) {
+    if(!$sth->execute(@fields)) {
         print STDERR $sth->errstr,$sql
     }
 
@@ -140,13 +140,18 @@ __END__
 
 There are no known bugs at the time of this release. However, if you spot a
 bug or are experiencing difficulties, that is not explained within the POD
-documentation, please send an email to barbie@cpan.org. However, it would help
-greatly if you are able to pinpoint problems or even supply a patch. 
+documentation, please send bug reports and patches to the RT Queue (see below).
 
 Fixes are dependant upon their severity and my availablity. Should a fix not
 be forthcoming, please feel free to (politely) remind me.
 
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
+
 =head1 SEE ALSO
+
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
 
 F<http://www.cpantesters.org/>,
 F<http://stats.cpantesters.org/>
@@ -160,7 +165,7 @@ F<http://stats.cpantesters.org/>
 
   Copyright (C) 2008 Barbie for Miss Barbell Productions.
 
-  This module is free software; you can redistribute it and/or 
+  This module is free software; you can redistribute it and/or
   modify it under the same terms as Perl itself.
 
 =cut

@@ -3,7 +3,7 @@ package CPAN::WWW::Testers::Generator;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 
 #----------------------------------------------------------------------------
 # Library Modules
@@ -32,10 +32,13 @@ sub new {
     bless $self, $class;
 
     # continue when no article
-    $self->{ignore} = $hash{ignore} if($hash{ignore});
+    $self->{ignore} = $hash{ignore}     if($hash{ignore});
+
+    # do not store old articles
+    $self->{nostore} = $hash{nostore}   if($hash{nostore});
 
     # prime the logging
-    $self->logfile($hash{logfile})  if($hash{logfile});
+    $self->logfile($hash{logfile})      if($hash{logfile});
 
     # prime the databases
     $self->directory($hash{directory});
@@ -102,10 +105,12 @@ sub generate {
             if($object->parse_upload()) {
                 $dist      = $object->distribution;
                 $version   = $object->version;
+                $from      = $object->author;
             }
 
             next    unless($self->_valid_field($id, 'dist'    => $dist));
             next    unless($self->_valid_field($id, 'version' => $version));
+            next    unless($self->_valid_field($id, 'author'  => $from));
 
         } else {
             if($object->parse_report()) {
@@ -134,6 +139,8 @@ sub generate {
         $self->insert_stats($id,$state,$post,$from,$dist,$version,$platform,$perl,$osname,$osvers,$date);
     }
 
+    $self->cleanup  if($self->{nostore});
+
     #$self->_dbh_disconnect();
 }
 
@@ -150,7 +157,7 @@ sub insert_stats {
 
     my @fields = @_;
     $fields[$_] ||= 0   for(0);
-    $fields[$_] ||= ''  for(1,2,3,4,5,6,8,9);
+    $fields[$_] ||= ''  for(1,2,3,4,5,6,8,9,10);
     $fields[$_] ||= '0' for(7);
 
     if(!$sth->execute(@fields)) {
@@ -190,6 +197,26 @@ sub insert_article {
     if((++$self->{arts_count} % 50) == 0) {
         $self->{arts}->commit;
     }
+}
+
+sub cleanup {
+    my $self = shift;
+    my $id = $self->_get_lastid();
+    next    unless($id);
+
+    my $sql = 'DELETE FROM articles WHERE id < ?';
+    my $sth = $self->{arts}->prepare($sql);
+    unless($sth) {
+        printf STDERR "ERROR: %s : %s\n", $self->{arts}->errstr, $sql;
+        exit;   # bail out
+    }
+
+    if(!$sth->execute($id)) {
+        printf STDERR "ERROR: %s : %s : [%s]\n", $sth->errstr, $sql, $id;
+        exit;   # bail out
+    }
+
+    $sth->finish;
 }
 
 #----------------------------------------------------------------------------
@@ -361,7 +388,7 @@ several index tables to speed up searches. The main table is as below:
   | perl     | TEXT                |
   | osname   | TEXT                |
   | osvers   | TEXT                |
-  | archname | TEXT                |
+  | platform | TEXT                |
   +----------+---------------------+
 
 The articles database schema is again very straightforward, and consists of one
@@ -428,6 +455,13 @@ Inserts an article into the articles database.
 
 Inserts the components of a parsed article into the statistics database.
 
+=item * cleanup
+
+In the event that you do not wish to store all the articles permanently in the
+articles database, this method removes all but the most recent entry, which is
+kept to ensure that subsequent runs will start from the correct article. To
+enable this feature, specify 'nostore' within the has passed to new().
+
 =item * logfile
 
 Accessor to set/get where the logging information is to be kept. Note that if
@@ -459,6 +493,26 @@ discussion mailing list.
   CPAN Testers Wiki - http://wiki.cpantesters.org
   CPAN Testers Discuss mailing list
     - http://lists.cpan.org/showlist.cgi?name=cpan-testers-discuss
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties, that is not explained within the POD
+documentation, please send bug reports and patches to the RT Queue (see below).
+
+Fixes are dependant upon their severity and my availablity. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
+
+=head1 SEE ALSO
+
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
+F<http://www.cpantesters.org/>,
+F<http://stats.cpantesters.org/>
 
 =head1 AUTHOR
 

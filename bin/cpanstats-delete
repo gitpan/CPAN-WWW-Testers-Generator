@@ -2,32 +2,35 @@
 use strict;
 $|++;
 
-my $VERSION = '0.03';
+my $VERSION = '0.10';
 
 #----------------------------------------------------------------------------
 
 =head1 NAME
 
-upstats.pl - script to update entries in the cpanstats database.
+cpanstats-delete - script to delete entries from the cpanstats database.
 
 =head1 SYNOPSIS
 
-  perl upstats.pl [-i=0] [--database=$db] [--file=$file]
+  perl cpanstats-delete [-a=0] [-d=0] [--database=$db] [--file=$file]
 
 =head1 DESCRIPTION
 
-Using the cpanstats database, which should in the local directory, will search
-for records matching the given id on the command line, or the list provided in
-a named file. If the named file is correctly formatted, the nominated columns
-will also be updated.
+Using the cpanstats database, which should in the local directory, extracts
+all the data into the components of each page. Creates the graphs, then
+creates each HTML page of the site.
 
 =head1 OPTIONS
 
 =over 4
 
-=item -i | --id
+=item -a | --all
 
-Display the record matching the given NNTP id.
+Delete all the NNTP ids greater than the specified number.
+
+=item -d | --delete
+
+Delete a single NNTP id.
 
 =item --database
 
@@ -35,22 +38,7 @@ Specify the exact path to the cpanstats database if not ./cpanstats.db.
 
 =item --file
 
-The named file will be used to retrieve a list of NNTP ids, and if correctly
-formatted will update columns for the nominated id.
-
-To display records for a list of ids, the file should look like:
-
-  1
-  2
-  3
-  4
-
-To update columns for given ids, the file should look like:
-
-  1,state='pass'
-  2,state='pass',dist='MyDist'
-
-Note that the second entry will update multiple columns
+Named file used when deleting a list of NNTP ids.
 
 =back
 
@@ -59,18 +47,20 @@ Note that the second entry will update multiple columns
 # -------------------------------------
 # Library Modules
 
+use lib qw(./lib ../lib);
+
 use DBI;
 use Getopt::Long;
 use IO::File;
 
-Use CPAN::WWW::Testers::Generator::Database;
+use CPAN::WWW::Testers::Generator::Database;
 
 # -------------------------------------
 # Variables
 
 use constant    DATABASE    => 'cpanstats.db';
 
-my (%options,@rows);
+my (%options);
 
 # -------------------------------------
 # Program
@@ -78,7 +68,8 @@ my (%options,@rows);
 ##### INITIALISE #####
 
 GetOptions( \%options,
-            "id|i=i",
+            "all|a=i",
+            "delete|d=i",
             "database=s",
             "file=s"
 );
@@ -91,21 +82,14 @@ print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
 
 ##### MAIN #####
 
-print "#id,state,postdate,tester,dist,version,platform,perl\n";
 my @list = get_list();
-push @list, {id=>$options{id}}    if($options{id});
-
-for my $item (@list) {
-    if($item->{set}) {
-        $dbi->do_query("UPDATE cpanstats SET $item->{set} WHERE id=$item->{id}");
-    }
-
-    @rows = $dbi->get_query("SELECT * FROM cpanstats WHERE id=$item->{id}");
-    print join(",",@$_)."\n"   for(@rows);
+for my $id (@list) {
+	print "Deleting ... $id\n";
+	$dbi->do_query("DELETE from cpanstats WHERE id=$id");
 }
 
-@rows = $dbi->get_query("SELECT max(id) FROM cpanstats");
-print "\n#MAX ID=$rows[0][0]\n" if(@rows);
+do_query("DELETE from cpanstats WHERE id>$options{all}")	if($options{all});
+do_query("DELETE from cpanstats WHERE id=$options{delete}")	if($options{delete});
 
 # -------------------------------------
 # Subroutines
@@ -123,10 +107,9 @@ sub get_list {
 
 	my $fh = IO::File->new($file)	or die "Cannot open file [$file]: $!";
 	while(<$fh>) {
-        next    if(/^\s*$/);    # ignore empty lines
 		chomp;
-		my ($id,$str) = (m/^(\d+)(?:,(.*))?/);
-		push @list, {id=>$id,set=>$str} if($id);
+		my ($num) = (m/^(\d+)/);
+		push @list, $num	if($num);
 	}
 	$fh->close;
 	return @list;
@@ -140,11 +123,13 @@ __END__
 
 There are no known bugs at the time of this release. However, if you spot a
 bug or are experiencing difficulties, that is not explained within the POD
-documentation, please send an email to barbie@cpan.org. However, it would help
-greatly if you are able to pinpoint problems or even supply a patch.
+documentation, please send bug reports and patches to the RT Queue (see below).
 
 Fixes are dependant upon their severity and my availablity. Should a fix not
 be forthcoming, please feel free to (politely) remind me.
+
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
@@ -160,7 +145,7 @@ F<http://stats.cpantesters.org/>
 
   Copyright (C) 2005-2008 Barbie for Miss Barbell Productions.
 
-  This module is free software; you can redistribute it and/or
+  This module is free software; you can redistribute it and/or 
   modify it under the same terms as Perl itself.
 
 =cut

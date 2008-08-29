@@ -2,17 +2,17 @@
 use strict;
 $|++;
 
-my $VERSION = '0.16';
+my $VERSION = '0.17';
 
 #----------------------------------------------------------------------------
 
 =head1 NAME
 
-readstats.pl - script to read the cpanstats database and verify the contents.
+cpanstats-verify - script to verify the contents of the cpanstats database.
 
 =head1 SYNOPSIS
 
-  perl readstats.pl [-c|-m] [-v|-s --file=$file] [--start=0] [--end=0]
+  perl cpanstats-verify [-c|-m] [-v|-s --file=$file] [--start=0] [--end=0]
 
 =head1 DESCRIPTION
 
@@ -386,11 +386,13 @@ __END__
 
 There are no known bugs at the time of this release. However, if you spot a
 bug or are experiencing difficulties, that is not explained within the POD
-documentation, please send an email to barbie@cpan.org. However, it would help
-greatly if you are able to pinpoint problems or even supply a patch.
+documentation, please send bug reports and patches to the RT Queue (see below).
 
 Fixes are dependant upon their severity and my availablity. Should a fix not
 be forthcoming, please feel free to (politely) remind me.
+
+RT Queue -
+http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
