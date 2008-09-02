@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.25';
+$VERSION = '0.26';
 
 #----------------------------------------------------------------------------
 
@@ -33,6 +33,8 @@ Database handling code for interacting with a local cpanstats database.
 # Library Modules
 
 use DBI;
+use File::Basename;
+use File::Path;
 
 # -------------------------------------
 # Variables
@@ -42,9 +44,9 @@ use constant    DATABASE    => 'cpanstats.db';
 # -------------------------------------
 # Routines
 
-=head1 FUNCTIONS
+=head1 INTERFACE
 
-=head2 Constructor
+=head2 The Constructor
 
 =over 4
 
@@ -56,13 +58,28 @@ use constant    DATABASE    => 'cpanstats.db';
 
 sub new {
     my ($class,%hash) = @_;
-    my $self = {};
+    return  unless($hash{database});
+
+    my $self = {database => $hash{database}};
     bless $self, $class;
 
-    $self->{database} = $hash{database} || DATABASE;
+    $self->{AutoCommit} = $hash{AutoCommit} || 0;
 
-    $self->{dbh} = DBI->connect("dbi:SQLite:dbname=$self->{database}",'','');
-    $self->{dbh}->{AutoCommit} = 1;
+    my $exists = -f $self->{database};
+
+    mkpath(dirname($self->{database}))  unless($exists);
+
+    $self->{dbh} = DBI->connect("DBI:SQLite:dbname=$self->{database}", "", "", {
+        RaiseError => 1,
+        AutoCommit => $self->{AutoCommit},
+        sqlite_handle_binary_nulls => 1,
+    });
+    return  unless($self->{dbh});
+
+    if(!$exists) {
+        eval { $self->_dbh_create($self->{dbh},$self->{database}) };
+        die "Failed to create database: $@"  if($@);
+    }
 
     return $self;
 }
@@ -71,12 +88,24 @@ sub DESTROY {
     my $self = shift;
     return      unless($self->{dbh});
 
+    $self->{dbh}->commit    unless($self->{AutoCommit});
     $self->{dbh}->disconnect;
 }
 
 =head2 Methods
 
 =over 4
+
+=item do_commit
+
+Force a commit if AutoCommit is off
+
+=cut
+
+sub do_commit {
+    my $self = shift;
+    $self->{dbh}->commit;
+}
 
 =item do_query
 
@@ -86,15 +115,18 @@ An SQL wrapper method to perform a non-returning request.
 
 sub do_query {
     my ($self,$sql,@fields) = @_;
+    my $sth;
 
     # prepare the sql statement for executing
-    my $sth = $self->{dbh}->prepare($sql);
-    print STDERR $self->{dbh}->errstr.":$sql\n"	unless($sth);
+    eval { $sth = $self->{dbh}->prepare($sql); };
+    unless($sth) {
+        die sprintf "ERROR: %s : %s\n", $self->{dbh}->errstr, $sql;
+    }
 
     # execute the SQL using any values sent to the function
     # to be placed in the sql
-    if(!$sth->execute(@fields)) {
-        print STDERR $sth->errstr,$sql
+    unless($sth->execute(@fields)) {
+        die sprintf "ERROR: %s : %s : [%s]\n", $sth->errstr, $sql, join(',',@fields);
     }
 
     $sth->finish;
@@ -107,10 +139,18 @@ An SQL wrapper method to perform a returning request.
 =cut
 
 sub get_query {
-    my ($self,$sql) = @_;
-    my @rows;
-    my $sth = $self->{dbh}->prepare($sql);
-    $sth->execute;
+    my ($self,$sql,@fields) = @_;
+    my ($sth,@rows);
+
+    eval { $sth = $self->{dbh}->prepare($sql); };
+    unless($sth) {
+        die sprintf "ERROR: %s : %s\n", $self->{dbh}->errstr, $sql;
+    }
+
+    unless($sth->execute(@fields)) {
+        die sprintf "ERROR: %s : %s : [%s]\n", $sth->errstr, $sql, join(',',@fields);
+    }
+
     while(my $row = $sth->fetchrow_arrayref) {
         push @rows, [@$row];
     }
@@ -124,13 +164,54 @@ An SQL wrapper method to perform a returning request, via an iterator.
 =cut
 
 sub get_query_iterator {
-    my ($self,$sql) = @_;
-    my @rows;
-    my $sth = $self->{dbh}->prepare($sql);
-    $sth->execute;
+    my ($self,$sql,@fields) = @_;
+    my ($sth,@rows);
+
+    eval { $sth = $self->{dbh}->prepare($sql); };
+    unless($sth) {
+        die sprintf "ERROR: %s : %s\n", $self->{dbh}->errstr, $sql;
+    }
+
+    unless($sth->execute(@fields)) {
+        die sprintf "ERROR: %s : %s : [%s]\n", $sth->errstr, $sql, join(',',@fields);
+    }
 
     return sub { return $sth->fetchrow_arrayref }
 }
+
+sub _dbh_create {
+    my ($self,$dbh,$db) = @_;
+    my @sql;
+
+    if($db =~ /cpanstats.db$/) {
+        push @sql,
+            'CREATE TABLE cpanstats (
+                          id            INTEGER PRIMARY KEY,
+                          state         TEXT,
+                          postdate      TEXT,
+                          tester        TEXT,
+                          dist          TEXT,
+                          version       TEXT,
+                          platform      TEXT,
+                          perl          TEXT,
+                          osname        TEXT,
+                          osvers        TEXT,
+                          date          TEXT)',
+
+            'CREATE INDEX distverstate ON cpanstats (dist, version, state)',
+            'CREATE INDEX ixperl ON cpanstats (perl)',
+            'CREATE INDEX ixplat ON cpanstats (platform)',
+            'CREATE INDEX ixdate ON cpanstats (postdate)';
+    } else {
+        push @sql,
+            'CREATE TABLE articles (
+                          id            INTEGER PRIMARY KEY,
+                          article       TEXT)';
+    }
+
+    $dbh->do($_)    for(@sql);
+}
+
 
 __END__
 
@@ -154,7 +235,8 @@ L<CPAN::WWW::Testers>,
 L<CPAN::Testers::WWW::Statistics>
 
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

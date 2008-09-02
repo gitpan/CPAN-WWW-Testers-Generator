@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.04';
+my $VERSION = '0.05';
 
 #----------------------------------------------------------------------------
 
@@ -79,15 +79,11 @@ my (%options,@rows);
 
 ##### INITIALISE #####
 
-GetOptions( \%options,
-            "id|i=i",
-            "database=s",
-            "file=s"
-);
+init_options();
 
 $options{database} ||= DATABASE;
 
-my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
+my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database}, AutoCommit => 1);
 print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
 
 
@@ -119,19 +115,64 @@ Returns the list of NNTP ids from the named file.
 =cut
 
 sub get_list {
-	my @list;
-	my $file = $options{file} || return ();
-	die "file [$file] not found"	unless(-f $file);
+    my @list;
+    my $file = $options{file} || return ();
+    die "file [$file] not found"	unless(-f $file);
 
-	my $fh = IO::File->new($file)	or die "Cannot open file [$file]: $!";
-	while(<$fh>) {
+    my $fh = IO::File->new($file)	or die "Cannot open file [$file]: $!";
+    while(<$fh>) {
         next    if(/^\s*$/);    # ignore empty lines
-		chomp;
-		my ($id,$str) = (m/^(\d+)(?:,(.*))?/);
-		push @list, {id=>$id,set=>$str} if($id);
-	}
-	$fh->close;
-	return @list;
+        chomp;
+        my ($id,$str) = (m/^(\d+)(?:,(.*))?/);
+        push @list, {id=>$id,set=>$str} if($id);
+    }
+    $fh->close;
+
+    return @list;
+}
+
+=item init_options
+
+Determine command line options and initialise any defaults.
+
+=cut
+
+sub init_options {
+    GetOptions( \%options,
+        'database=s',
+        'id|i=i',
+        'file=s'
+        'help|h',
+        'version|V'
+    );
+
+    _help(1) if($options{help});
+    _help(0) if($options{version});
+}
+
+sub _help {
+    my $full = shift;
+
+    if($full) {
+        print <<HERE;
+
+Usage: $0 \\
+         [--database=<db>] \\
+	 [ ( [--start=n] [--end=n] | --update=<file> ) ] \\
+	 [-h] [-V]
+
+  --database=<db>   use named database
+  --id=<num>        refresh this id
+  --file=<file>     refresh these ids (1 per line)
+  -h                this help screen
+  -V                program version
+
+HERE
+
+    }
+
+    print "$0 v$VERSION\n";
+    exit(0);
 }
 
 __END__
@@ -152,8 +193,12 @@ http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

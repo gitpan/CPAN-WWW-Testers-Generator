@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.17';
+my $VERSION = '0.18';
 
 #----------------------------------------------------------------------------
 
@@ -57,12 +57,18 @@ Named file used when verifying a list of NNTP ids.
 
 Start and end NNTP ids.
 
+=item -h | --help
+
+Print the help screen
+
 =back
 
 =cut
 
 # -------------------------------------
 # Library Modules
+
+use lib qw(./lib ../lib);
 
 use DBI;
 use Email::Simple;
@@ -71,7 +77,7 @@ use Getopt::ArgvFile default=>1;
 use Getopt::Long;
 use IO::File;
 
-Use CPAN::WWW::Testers::Generator::Database;
+use CPAN::WWW::Testers::Generator::Database;
 
 # -------------------------------------
 # Variables
@@ -89,30 +95,21 @@ use constant    NNTPSTART   => 872391;
 
 progress("init");
 
-GetOptions( \%options,
-            "database=s",
-            "missing|m",
-            "check|c",
-            "verify|v",
-            "search|s",
-            "start=i",
-            "end=i",
-            "file=s",
-            "log=s",
-            "out=s"
-);
+init_options();
 
 $options{database} ||= DATABASE;
+
+my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database}, AutoCommit => 1);
+print STDERR "Cannot connect to database [$options{database}]\n"        unless($dbi);
+
 $options{start}    ||= NNTPSTART;
 $options{end}      ||= get_lastid();
 
-my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
-print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
-
-my $nntp = Net::NNTP->new("nntp.perl.org")
-        || die "Cannot connect to nntp.perl.org";
-my($num, $first, $last) = $nntp->group("perl.cpan.testers");
-
+my $nntp;
+unless($options{localonly}) {
+    $nntp = Net::NNTP->new("nntp.perl.org") || die "Cannot connect to nntp.perl.org";
+    $nntp->group("perl.cpan.testers");
+}
 
 ##### MAIN #####
 
@@ -206,7 +203,16 @@ sub check_stats {
         # missing entries (ignore human replies)
         while($count < $row->[0]) {
             my ($subj,$from) = get_subject($count);
-            _log("$count,$from,missing - $subj")  unless($subj =~ /Re:/i);
+            _log("$count,$from,missing - $subj")  unless($subj =~ /(?:Re:|Fw:|Ab:|mirror update)/i ||
+							 $subj =~ /\.(?:readme|pl|cgi|pdf|html?|doc|txt|ppd|asc|yml|jpg|png|gif|rtf|css|pod|sig|diff)$/i);
+
+            # note that in the above two regexes we ignore conversation 
+	    # threads, mirror updates and a whole host of uploads that
+	    # are nothing to do with a distribution upload. The caveats
+	    # to this are the entries that are potentially bad uploads
+	    # (bad archive naming or uploading a .pm file) and any 
+	    # reports that are in error.
+
             $count++;
         }
 
@@ -285,6 +291,8 @@ sub get_subject {
   # can we short cut?
   find_id($id)                                  unless($log{$id});
   return($log{$id}{subject},$log{$id}{from})    if($log{$id});
+
+  return "" if($options{localonly});
 
   # talk NNTP
   my $article = join "", @{$nntp->article($id) || []};
@@ -377,6 +385,58 @@ sub progress {
     $lasttime = $time;
 }
 
+sub init_options {
+    GetOptions( \%options,
+        'database=s',
+        'localonly|l',
+        'missing|m',
+        'check|c',
+        'verify|v',
+        'search|s',
+        'start=i',
+        'end=i',
+        'file=s',
+        'log=s',
+        'out=s',
+        'help|h',
+        'version|V'
+    );
+
+    _help(1) if($options{help});
+    _help(0) if($options{version});
+}
+
+sub _help {
+    my $full = shift;
+
+    if($full) {
+        print <<HERE;
+
+Usage: $0 \\
+         [-database=<db>] [-c] [-m] [-v] [-s] \\
+         [--file=<file>] [--start=n] [--end=n] \\
+	 [--log=<file>] [-out=<file>] [-h] [-V]
+
+  --database=<db>   use a named database
+  -m                check for missing entries
+  -c                check existing entries for bad parsing
+  -v                provide a verification report
+  -s                search stats providing id + subject
+  --file            file of IDs to reference
+  --start           start id for -m or -c
+  --end             end id for -m or -c
+  --log             log file for shortcut reference for -m and -c
+  --out             results output file
+  -h                this help screen
+  -V                program version
+
+HERE
+
+    }
+
+    print "$0 v$VERSION\n";
+    exit(0);
+}
 
 __END__
 
@@ -396,8 +456,12 @@ http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

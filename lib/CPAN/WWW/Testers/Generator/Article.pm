@@ -3,7 +3,7 @@ package CPAN::WWW::Testers::Generator::Article;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.25';
+$VERSION = '0.26';
 
 #----------------------------------------------------------------------------
 # Library Modules
@@ -120,11 +120,19 @@ sub parse_upload {
     my $subject = $self->{subject};
 
     return 0	unless($subject =~ /CPAN Upload:\s+([-\w\/\.\+]+)/i);
-
     my $distvers = $1;
+
     # CPAN::DistnameInfo doesn't support .tar.bz2 files ... yet
     $distvers =~ s/(\.tar)?\.t?bz2//i;
     $distvers .= '.tar.gz' unless $distvers =~ /\.(tar|tgz|zip)/i;
+
+    # CPAN::DistnameInfo doesn't support old form of uploads
+    my @parts = split("/",$distvers);
+    if(@parts == 2) {
+        my ($first,$second,$rest) = split(//,$distvers,3);
+        $distvers = "$first/$first$second/$first$second$rest";
+    }
+
     my $d = CPAN::DistnameInfo->new($distvers);
     $self->distribution($d->dist);
     $self->version($d->version);
@@ -148,6 +156,7 @@ sub parse_report {
     $distversion =~ s!/$!!;
     $distversion =~ s/\.tar.*/.tar.gz/;
     $distversion .= '.tar.gz' unless $distversion =~ /\.(tar|tgz|zip)/;
+
     my $d = CPAN::DistnameInfo->new($distversion);
     my ($dist, $version) = ($d->dist, $d->version);
     return 0 unless defined $dist;
@@ -233,27 +242,39 @@ CPAN::WWW::Testers::Generator::Article - Parse a CPAN Testers article
 
 This is used by CPAN::WWW::Testers::Generator.
 
-=head1 METHODS
+=head1 INTERFACE
 
-=head2 new
+=head2 The Constructor
+
+=over 4
+
+=item * new
 
 The constructor. Pass in a reference to the article.
 
-=head2 parse_upload
+=back
+
+=head2 Methods
+
+=over 4
+
+=item * parse_upload
 
 Parses an upload article.
 
-=head2 parse_report
+=item * parse_report
 
 Parses a report article.
 
-=head2 passed
+=item * passed
 
 Whether the report was a PASS
 
-=head2 failed
+=item * failed
 
 Whether the report was a FAIL
+
+=back
 
 =head2 Accessors
 
@@ -327,7 +348,8 @@ L<CPAN::WWW::Testers>,
 L<CPAN::Testers::WWW::Statistics>
 
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

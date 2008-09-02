@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.06';
+my $VERSION = '0.07';
 
 #----------------------------------------------------------------------------
 
@@ -63,23 +63,11 @@ my (%options);
 
 ##### INITIALISE #####
 
-GetOptions( \%options,
-	    "database=s",
-	    "nntp|n=s",
-	    "distro|m=s",
-	    "dist|d=s",
-	    "distversion|x=s",
-	    "help|h",
-	    "platform|o=s",
-	    "perl|p=s",
-	    "tester|t=s",
-	    "version|v=s",
-	    "date|y=s"
-);
+init_options();
 
 $options{database} ||= DATABASE;
 
-my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
+my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database}, AutoCommit => 1);
 print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
 
 
@@ -105,8 +93,6 @@ push @where, "platform=''"				if(defined $options{platform} && $options{platform
 push @where, "perl='$options{perl}'"			if(defined $options{perl} && $options{perl} ne '-');
 push @where, "perl=''"					if(defined $options{perl} && $options{perl} eq '-');
 
-usage()							if($options{help});
-
 if(@where) {
     my @rows = $dbi->get_query($sql . join(' AND ',@where));
     if(@rows) {
@@ -120,16 +106,39 @@ if(@where) {
     print "No SQL arguments given\n";
 }
 
-=item usage
 
-How to use this script.
+# -------------------------------------
+# Subroutines
 
-=cut
+sub init_options {
+    GetOptions( \%options,
+	'database=s',
+	'nntp|n=s',
+	'distro|m=s',
+	'dist|d=s',
+	'distversion|x=s',
+	'platform|o=s',
+	'perl|p=s',
+	'tester|t=s',
+	'version|v=s',
+	'date|y=s',
+        'help|h'
+        'version|V'
+    );
 
-sub usage {
-    print <<HERE;
+    _help(1) if($options{help});
+    _help(0) if($options{Version});
+}
+
+sub _help {
+    my $full = shift;
+
+    if($full) {
+        print <<HERE;
+
 Usage: $0
     [--database=<db>]               - path to cpanstats database
+
     [--nntp|-n=<nntpid>]            - NNTP article id
     [--dist|-d=<distname>]          - distribution name
     [--disto|-m=<distname>]         - distribution name (partial match)
@@ -138,16 +147,22 @@ Usage: $0
     [--tester|-t=<email>]           - tester email
     [--platform|-o=<platform>]      - platform (partial match)
     [--perl|-p=<perlversion>]       - perl version
+
     [--help|-h]                     - this screen
+    [--Version|-V]                  - program version
 
 Notes:
     - combine options (except help) to refine your search
     - all entries (except distro and paltform) require an exact match
     - only one of nntp, dist or distro (in order of preference) is accepted
     - use '-' for tester, perl and platform to find blank entries
+
 HERE
 
-    exit;
+    }
+
+    print "$0 v$VERSION\n";
+    exit(0);
 }
 
 
@@ -169,8 +184,12 @@ http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

@@ -27,7 +27,7 @@ DESCRIPTION
     1.5 million articles in the newgroup. As such updating from a known copy of the
     database is much more advisable. If you don't want to generate the database
     yourself, you can obtain the latest official copy (compressed with gzip) at
-    http://stats.cpantesters.org/cpanstats.db.gz
+    http://devel.cpantesters.org/cpanstats.db.gz
 
 INTERFACE
   The Constructor

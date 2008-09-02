@@ -3,17 +3,19 @@ package CPAN::WWW::Testers::Generator;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.25';
+$VERSION = '0.26';
 
 #----------------------------------------------------------------------------
 # Library Modules
 
-use CPAN::WWW::Testers::Generator::Article;
 use DBI;
 use File::Basename;
 use File::Path;
 use IO::File;
 use Net::NNTP;
+
+use CPAN::WWW::Testers::Generator::Article;
+use CPAN::WWW::Testers::Generator::Database;
 
 use base qw(Class::Accessor::Fast);
 
@@ -50,25 +52,27 @@ sub new {
 
 sub DESTROY {
     my $self = shift;
-    $self->_dbh_disconnect();
 }
+
+#----------------------------------------------------------------------------
+# Public Methods
 
 sub generate {
     my $self = shift;
 
-    $self->{stats} = $self->_dbh_connect($self->database)   unless($self->{stats});
-    $self->{arts}  = $self->_dbh_connect($self->articles)   unless($self->{arts});
+    $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
+    $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
+    $self->{nntp}  ||= $self->nntp_connect();
 
-    # connect to NNTP server
-    my $nntp = Net::NNTP->new("nntp.perl.org")
-        || die "Cannot connect to nntp.perl.org";
-    my($num, $first, $last) = $nntp->group("perl.cpan.testers");
+    my $start = $self->_get_lastid() +1;
+    my $end   = $self->{nntp_last};
+    die "Cannot access NNTP server\n"   unless($end);   # better to bail out than fade away!
 
     # starting from last retrieved article
-    for(my $id = $self->_get_lastid() +1; $id <= $last; $id++) {
+    for(my $id = $start; $id <= $end; $id++) {
 
         $self->_log("ID [$id]");
-        my $article = join "", @{$nntp->article($id) || []};
+        my $article = join "", @{$self->{nntp}->article($id) || []};
 
         # no article for that id!
         unless($article) {
@@ -81,142 +85,197 @@ sub generate {
         }
 
         $self->insert_article($id,$article);
-        my $object = CPAN::WWW::Testers::Generator::Article->new($article);
-
-        unless($object) {
-            $self->_log(" ... bad parse\n");
-            next;
-        }
-
-        my $subject = $object->subject;
-        my $from    = $object->from;
-        $self->_log(" [$from] $subject\n");
-        next    if($subject =~ /Re:/i);
-
-        unless($subject =~ /(CPAN|FAIL|PASS|NA|UNKNOWN)\s+/i) {
-            $self->_log(" . [$id] ... bad subject\n");
-            next;
-        }
-
-        my $state = lc $1;
-        my ($post,$date,$dist,$version,$platform,$perl,$osname,$osvers) = ();
-
-        if($state eq 'cpan') {
-            if($object->parse_upload()) {
-                $dist      = $object->distribution;
-                $version   = $object->version;
-                $from      = $object->author;
-            }
-
-            next    unless($self->_valid_field($id, 'dist'    => $dist));
-            next    unless($self->_valid_field($id, 'version' => $version));
-            next    unless($self->_valid_field($id, 'author'  => $from));
-
-        } else {
-            if($object->parse_report()) {
-                $dist      = $object->distribution;
-                $version   = $object->version;
-                $from      = $object->from;
-                $perl      = $object->perl;
-                $platform  = $object->archname;
-                $osname    = $object->osname;
-                $osvers    = $object->osvers;
-
-                $from      =~ s/'/''/g; #'
-            }
-
-            next    unless($self->_valid_field($id, 'dist'     => $dist));
-            next    unless($self->_valid_field($id, 'version'  => $version));
-            next    unless($self->_valid_field($id, 'from'     => $from));
-            next    unless($self->_valid_field($id, 'perl'     => $perl));
-            next    unless($self->_valid_field($id, 'platform' => $platform));
-            next    unless($self->_valid_field($id, 'osname'   => $osname));
-            next    unless($self->_valid_field($id, 'osvers'   => $osvers));
-        }
-
-        $post = $object->postdate;
-        $date = $object->date;
-        $self->insert_stats($id,$state,$post,$from,$dist,$version,$platform,$perl,$osname,$osvers,$date);
+        $self->parse_article($id,$article);
     }
 
     $self->cleanup  if($self->{nostore});
+    $self->{stats}->do_commit;
+    $self->{arts}->do_commit;
+}
 
-    #$self->_dbh_disconnect();
+
+sub rebuild {
+    my ($self,$start,$end) = @_;
+
+    $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
+    $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
+
+    $start ||= 1;
+    $end   ||= $self->_get_lastid();
+
+    $self->{stats}->do_query("DELETE FROM cpanstats WHERE id >= $start AND id <= $end");
+
+    my $iterator = $self->{arts}->get_query_iterator("SELECT * FROM articles WHERE id >= $start AND id <= $end ORDER BY id asc");
+    while(my $row = $iterator->()) {
+        my $id = $row->[0];
+	    my $article = $row->[1];
+
+        $self->_log("ID [$id]");
+
+        # no article for that id!
+        unless($article) {
+            $self->_log(" ... no article\n");
+            if($self->{ignore}) {
+                next;
+            } else {
+                die "No article returned [$id]\n";
+            }
+        }
+
+        $self->parse_article($id,$article);
+    }
+
+    $self->{stats}->do_commit;
+    $self->{arts}->do_commit;
+}
+
+sub reparse {
+    my ($self,$options,@ids) = @_;
+    return  unless(@ids);
+
+    $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
+    $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
+    $self->{nntp}  ||= $self->nntp_connect()   unless($options && $options->{localonly});
+
+    my $last = $self->_get_lastid();
+
+    for my $id (@ids) {
+        next    if($id < 1 || $id > $last);
+
+        my $article;
+        my @rows = $self->{arts}->get_query('SELECT * FROM articles WHERE id = ?',$id);
+        if(@rows) {
+            $article = $rows[0]->[1];
+
+        } elsif($options && $options->{localonly}) {
+            next;
+
+        } else {
+            $article = join "", @{$self->{nntp}->article($id) || []};
+        }
+
+        next    unless($article);
+        $self->_log("ID [$id]");
+
+        $self->{stats}->do_query('DELETE FROM cpanstats WHERE id = ?',$id)  unless($options && $options->{check});
+        $self->parse_article($id,$article,$options);
+    }
+
+    $self->{stats}->do_commit;
+}
+
+sub cleanup {
+    my $self = shift;
+    my $id = $self->_get_lastid();
+    return  unless($id);
+
+    my $sql = 'DELETE FROM articles WHERE id < ?';
+    $self->{arts}->do_query($sql,$id);
+}
+
+#----------------------------------------------------------------------------
+# Private Methods
+
+sub nntp_connect {
+    my $self = shift;
+
+    # connect to NNTP server
+    my $nntp = Net::NNTP->new("nntp.perl.org") or die "Cannot connect to nntp.perl.org";
+    ($self->{nntp_num}, $self->{nntp_first}, $self->{nntp_last}) = $nntp->group("perl.cpan.testers");
+
+    return $nntp;
+}
+
+sub parse_article {
+    my ($self,$id,$article,$options) = @_;
+    my $object = CPAN::WWW::Testers::Generator::Article->new($article);
+
+    unless($object) {
+        $self->_log(" ... bad parse\n");
+        return;
+    }
+
+    my $subject = $object->subject;
+    my $from    = $object->from;
+    $self->_log(" [$from] $subject\n");
+    return    if($subject =~ /Re:/i);
+
+    unless($subject =~ /(CPAN|FAIL|PASS|NA|UNKNOWN)\s+/i) {
+        $self->_log(" . [$id] ... bad subject\n");
+        return;
+    }
+
+    my $state = lc $1;
+    my ($post,$date,$dist,$version,$platform,$perl,$osname,$osvers) = ();
+
+    if($state eq 'cpan') {
+        if($object->parse_upload()) {
+            $dist      = $object->distribution;
+            $version   = $object->version;
+            $from      = $object->author;
+        }
+
+        return  unless($self->_valid_field($id, 'dist'    => $dist)     || ($options && $options->{exclude}{dist}));
+        return  unless($self->_valid_field($id, 'version' => $version)  || ($options && $options->{exclude}{version}));
+        return  unless($self->_valid_field($id, 'author'  => $from)     || ($options && $options->{exclude}{from}));
+
+    } else {
+        if($object->parse_report()) {
+            $dist      = $object->distribution;
+            $version   = $object->version;
+            $from      = $object->from;
+            $perl      = $object->perl;
+            $platform  = $object->archname;
+            $osname    = $object->osname;
+            $osvers    = $object->osvers;
+
+            $from      =~ s/'/''/g; #'
+        }
+
+        return  unless($self->_valid_field($id, 'dist'     => $dist)        || ($options && $options->{exclude}{dist}));
+        return  unless($self->_valid_field($id, 'version'  => $version)     || ($options && $options->{exclude}{version}));
+        return  unless($self->_valid_field($id, 'from'     => $from)        || ($options && $options->{exclude}{from}));
+        return  unless($self->_valid_field($id, 'perl'     => $perl)        || ($options && $options->{exclude}{perl}));
+        return  unless($self->_valid_field($id, 'platform' => $platform)    || ($options && $options->{exclude}{platform}));
+        return  unless($self->_valid_field($id, 'osname'   => $osname)      || ($options && $options->{exclude}{osname}));
+        return  unless($self->_valid_field($id, 'osvers'   => $osvers)      || ($options && $options->{exclude}{osname}));
+    }
+
+    $post = $object->postdate;
+    $date = $object->date;
+    $self->insert_stats($id,$state,$post,$from,$dist,$version,$platform,$perl,$osname,$osvers,$date)
+        unless($options && $options->{check});
 }
 
 sub insert_stats {
     my $self = shift;
-
-    my $INSERT = 'INSERT INTO cpanstats VALUES (?,?,?,?,?,?,?,?,?,?,?)';
-
-    my $sth = $self->{stats}->prepare($INSERT);
-    unless($sth) {
-        printf STDERR "ERROR: %s : %s\n", $self->{stats}->errstr, $INSERT;
-        exit;   # bail out
-    }
 
     my @fields = @_;
     $fields[$_] ||= 0   for(0);
     $fields[$_] ||= ''  for(1,2,3,4,5,6,8,9,10);
     $fields[$_] ||= '0' for(7);
 
-    if(!$sth->execute(@fields)) {
-        printf STDERR "ERROR: %s : %s : [%s]\n", $sth->errstr, $INSERT,join(',',@fields);
-        exit;   # bail out
-    }
+    my $INSERT = 'INSERT INTO cpanstats VALUES (?,?,?,?,?,?,?,?,?,?,?)';
 
-    $sth->finish;
-
+    $self->{stats}->do_query($INSERT,@fields);
     if((++$self->{stat_count} % 50) == 0) {
-        $self->{stats}->commit;
+        $self->{stats}->do_commit;
     }
 }
 
 sub insert_article {
     my $self = shift;
 
-    my $INSERT = 'INSERT INTO articles VALUES (?,?)';
-
-    my $sth = $self->{arts}->prepare($INSERT);
-    unless($sth) {
-        printf STDERR "ERROR: %s : %s\n", $self->{arts}->errstr, $INSERT;
-        exit;   # bail out
-    }
-
     my @fields = @_;
     $fields[$_] ||= 0   for(0);
     $fields[$_] ||= ''  for(1);
 
-    if(!$sth->execute(@fields)) {
-        printf STDERR "ERROR: %s : %s : [%s]\n", $sth->errstr, $INSERT,join(',',@fields);
-        exit;   # bail out
-    }
+    my $INSERT = 'INSERT INTO articles VALUES (?,?)';
 
-    $sth->finish;
-
+    $self->{arts}->do_query($INSERT,@fields);
     if((++$self->{arts_count} % 50) == 0) {
-        $self->{arts}->commit;
+        $self->{arts}->do_commit;
     }
-}
-
-sub cleanup {
-    my $self = shift;
-    my $id = $self->_get_lastid();
-    next    unless($id);
-
-    my $sql = 'DELETE FROM articles WHERE id < ?';
-    my $sth = $self->{arts}->prepare($sql);
-    unless($sth) {
-        printf STDERR "ERROR: %s : %s\n", $self->{arts}->errstr, $sql;
-        exit;   # bail out
-    }
-
-    if(!$sth->execute($id)) {
-        printf STDERR "ERROR: %s : %s : [%s]\n", $sth->errstr, $sql, $id;
-        exit;   # bail out
-    }
-
-    $sth->finish;
 }
 
 #----------------------------------------------------------------------------
@@ -229,92 +288,12 @@ sub _valid_field {
     return 0;
 }
 
-sub _dbh_connect {
-    my $self = shift;
-    my $db   = shift;
-    my $exists = -f $db;
-
-    mkpath(dirname($db))    unless($exists);
-
-    my $dsn = "DBI:SQLite:dbname=$db";
-    my $dbh = DBI->connect($dsn, "", "", {
-        RaiseError => 1,
-        AutoCommit => 0,
-        sqlite_handle_binary_nulls => 1,
-    });
-
-    if(!$exists) {
-        eval { $self->_dbh_create($dbh,$db) };
-        die "Failed to create database: $@"  if($@);
-    }
-
-    return $dbh;
-}
-
-sub _dbh_disconnect {
-    my $self = shift;
-
-    if($self->{stats}) {
-        $self->{stats}->commit;
-        $self->{stats}->disconnect;
-        $self->{stats} = undef;
-    }
-
-    if($self->{arts}) {
-        $self->{arts}->commit;
-        $self->{arts}->disconnect;
-        $self->{arts} = undef;
-    }
-}
-
-sub _dbh_create {
-    my ($self,$dbh,$db) = @_;
-    my @sql;
-
-    if($db =~ /cpanstats.db$/) {
-        push @sql,
-            'CREATE TABLE cpanstats (
-                          id            INTEGER PRIMARY KEY,
-                          state         TEXT,
-                          postdate      TEXT,
-                          tester        TEXT,
-                          dist          TEXT,
-                          version       TEXT,
-                          platform      TEXT,
-                          perl          TEXT,
-                          osname        TEXT,
-                          osvers        TEXT,
-                          date          TEXT)',
-
-            'CREATE INDEX distverstate ON cpanstats (dist, version, state)',
-            'CREATE INDEX ixperl ON cpanstats (perl)',
-            'CREATE INDEX ixplat ON cpanstats (platform)',
-            'CREATE INDEX ixdate ON cpanstats (postdate)';
-    } else {
-        push @sql,
-            'CREATE TABLE articles (
-                          id            INTEGER PRIMARY KEY,
-                          article       TEXT)';
-    }
-
-    $dbh->do($_)    for(@sql);
-}
-
 sub _get_lastid {
     my $self = shift;
 
-    my $sth = $self->{arts}->prepare("SELECT max(id) FROM articles");
-    return 0    unless($sth);
-    unless($sth->execute) {
-        $sth->finish;
-        return 0;
-    }
-
-    my $row = $sth->fetchrow_arrayref();
-    $sth->finish();
-
-    return 0    unless($row);
-    return $row->[0] || 0;
+    my @rows = $self->{arts}->get_query("SELECT max(id) FROM articles");
+    return 0    unless(@rows);
+    return $rows[0]->[0] || 0;
 }
 
 sub _log {
@@ -359,16 +338,15 @@ A good example query for Acme-Colour would be:
   SELECT version, status, count(*) FROM cpanstats WHERE
   distribution = "Acme-Colour" group by version, state;
 
-To create a database from scratch can take several hours, as there are now over
-1.5 million articles in the newgroup. As such updating from a known copy of the
+To create a database from scratch can take several days, as there are now over
+2 million articles in the newgroup. As such updating from a known copy of the
 database is much more advisable. If you don't want to generate the database
 yourself, you can obtain the latest official copy (compressed with gzip) at
-http://stats.cpantesters.org/cpanstats.db.gz
+http://devel.cpantesters.org/cpanstats.db.gz
 
-It should be noted that now with nearly 2 million articles in the archive,
-running this software to generate the databases from scratch can take a long
-time (days), unless you have a high-end processor machine. And even then it
-will still take a long time!
+With over 2 million articles in the archive, if you do plan to run this
+software to generate the databases it is recommended you utilise a high-end
+processor machine. Even with a reasonable processor it can takes days!
 
 =head1 DATABASE SCHEMA
 
@@ -388,14 +366,17 @@ several index tables to speed up searches. The main table is as below:
   | perl     | TEXT                |
   | osname   | TEXT                |
   | osvers   | TEXT                |
-  | platform | TEXT                |
+  | date     | TEXT                |
   +----------+---------------------+
+
+It should be noted that 'postdate' refers to the YYYYMM formatted date, whereas
+the 'date' field refers to the YYYYMMDDhhmm formatted date and time.
 
 The articles database schema is again very straightforward, and consists of one
 table, as below:
 
   +--------------------------------+
-  | cpanstats                      |
+  | articles                       |
   +----------+---------------------+
   | id       | INTEGER PRIMARY KEY |
   | article  | TEXT                |
@@ -423,11 +404,9 @@ file. The 'directory' value is where all databases will be created.
 
 =back
 
-=head2 Methods
+=head2 Accessors
 
 =over
-
-=item
 
 =item * articles
 
@@ -441,11 +420,61 @@ Accessor to set/get the database full path.
 
 Accessor to set/get the directory where the database is to be created.
 
+=item * logfile
+
+Accessor to set/get where the logging information is to be kept. Note that if
+this not set, no logging occurs.
+
+=back
+
+=head2 Public Methods
+
+=over
+
 =item * generate
 
 Starting from the last recorded article, retrieves all the more recent articles
 from the NNTP server, parsing each and recording the articles that either
 upload announcements or reports.
+
+=item * rebuild
+
+In the event that the cpanstats database needs regenerating, either in part or
+for the whole database, this method allow you to do so. You may supply
+parameters as to the 'start' and 'end' values (inclusive), where all records
+are assumed by default. Note that the 'nostore' option is ignored and no
+records are deleted from the articles database.
+
+=item * reparse
+
+Rather than a complete rebuild the option to selective reparse selected entries
+is useful if there are posts which have since been identified as valid and now
+have supporting parsing code within the codebase.
+
+In addition there is the option to exclude fields from parsing checks, where
+they may be corrupted, and can be later amended using the 'cpanstats-update'
+tool.
+
+=item * cleanup
+
+In the event that you do not wish to store all the articles permanently in the
+articles database, this method removes all but the most recent entry, which is
+kept to ensure that subsequent runs will start from the correct article. To
+enable this feature, specify 'nostore' within the has passed to new().
+
+=back
+
+=head2 Private Methods
+
+=over
+
+=item * nntp_connect
+
+Sets up the connection to the NNTP server.
+
+=item * parse_article
+
+Parses an article extracting the metadata required for the stats database.
 
 =item * insert_article
 
@@ -455,25 +484,13 @@ Inserts an article into the articles database.
 
 Inserts the components of a parsed article into the statistics database.
 
-=item * cleanup
-
-In the event that you do not wish to store all the articles permanently in the
-articles database, this method removes all but the most recent entry, which is
-kept to ensure that subsequent runs will start from the correct article. To
-enable this feature, specify 'nostore' within the has passed to new().
-
-=item * logfile
-
-Accessor to set/get where the logging information is to be kept. Note that if
-this not set, no logging occurs.
-
 =back
 
 =head1 HISTORY
 
 The CPAN testers was conceived back in May 1998 by Graham Barr and Chris
 Nandor as a way to provide multi-platform testing for modules. Today there
-are over 1.5 million tester reports and more than 100 testers each month
+are over 2 million tester reports and more than 100 testers each month
 giving valuable feedback for users and authors alike.
 
 =head1 BECOME A TESTER
@@ -490,7 +507,8 @@ smoke tools.
 For further help and advice, please subscribe to the the CPAN Testers
 discussion mailing list.
 
-  CPAN Testers Wiki - http://wiki.cpantesters.org
+  CPAN Testers Wiki
+    - http://wiki.cpantesters.org
   CPAN Testers Discuss mailing list
     - http://lists.cpan.org/showlist.cgi?name=cpan-testers-discuss
 
@@ -512,7 +530,8 @@ L<CPAN::WWW::Testers>,
 L<CPAN::Testers::WWW::Statistics>
 
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

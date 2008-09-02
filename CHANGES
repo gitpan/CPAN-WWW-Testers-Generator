@@ -1,5 +1,23 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.26	02/09/2008
+	- abstracted all database functionality out of Generator.pm into
+	  Database.pm, including database creation. All scripts updated too.
+	- database links changed to reference CPAN Testers development site.
+	- corrections to the database schema in POD
+	- several POD updates across all files, including
+	    bin/cpanstats	  (v0.04)
+	    bin/cpanstats-delete  (v0.11)
+	    bin/cpanstats-reparse (v0.07)
+	    bin/cpanstats-select  (v0.07)
+	    bin/cpanstats-update  (v0.05)
+	    bin/cpanstats-verify  (v0.18)
+	- fixed dependency in cpanstats
+	- consistently provided help|h and version|V options to all scripts
+	- fix to support old form of PAUSE uploads
+	- abstracted reparse code into Generator.pm from cpanstats-reparse
+	- more tests
+
 0.25	28/08/2008
 	- added POD about bugs and see also sections.
 	- fixed POD in scripts.

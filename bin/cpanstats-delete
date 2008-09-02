@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.10';
+my $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -67,16 +67,11 @@ my (%options);
 
 ##### INITIALISE #####
 
-GetOptions( \%options,
-            "all|a=i",
-            "delete|d=i",
-            "database=s",
-            "file=s"
-);
+init_options();
 
 $options{database} ||= DATABASE;
 
-my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
+my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database}, AutoCommit => 1);
 print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
 
 
@@ -115,6 +110,52 @@ sub get_list {
 	return @list;
 }
 
+=item init_options
+
+Determine command line options and initialise any defaults.
+
+=cut
+
+sub init_options {
+    GetOptions( \%options,
+        'all|a=i',
+        'delete|d=i',
+        'database=s',
+        'file=s'
+        'help|h',
+        'version|V'
+    );
+
+    _help(1) if($options{help});
+    _help(0) if($options{version});
+}
+
+sub _help {
+    my $full = shift;
+
+    if($full) {
+        print <<HERE;
+
+Usage: $0 \\
+         [--database=<db>] \\
+	 ( --all=<num> | --delete=<num> | --file=<file> ) \\
+	 [-h] [-V]
+
+  --database=<db>   use named database
+  --all=<num>       delete all entried greater than given id
+  --delete=<num>    delete given id
+  --file=<file>     delete multiple ids (1 per line)
+  -h                this help screen
+  -V                program version
+
+HERE
+
+    }
+
+    print "$0 v$VERSION\n";
+    exit(0);
+}
+
 __END__
 
 =back
@@ -133,8 +174,12 @@ http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 

@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.06';
+my $VERSION = '0.07';
 
 #----------------------------------------------------------------------------
 
@@ -12,10 +12,12 @@ cpanstats-reparse - script to reparse an NNTP article.
 
 =head1 SYNOPSIS
 
-  perl cpanstats-reparse [--check|c]            \
+  perl cpanstats-reparse			\
+    [--directory=<dir>]                         \
+    [--check|c] [--localonly|l]                 \
     ( [--id=<nntpid>] | [--file=<filename>] )   \
-    [--database=<db>]                           \
-    [--exclude|x=<fields>]
+    [--exclude|x=<fields>]			\
+    [--help|h]
 
 =head1 DESCRIPTION
 
@@ -24,7 +26,8 @@ incorrectly parsed by the cpanstats, and should feature in the stats
 for the CPAN Testers Statistics database.
 
 Note that the "check" option will only go through the motions and will not
-update the local database.
+update the local database, while the "localonly" option will ensure only the
+local articles.db database is used to reparse, no NNTP lookup is used.
 
 The ability to ignore field checking for specific fields is enabled via the
 use of the exclude option. Using a comma separated list you may enter one
@@ -37,163 +40,46 @@ amend the appropriate field to the correct value.
 # -------------------------------------
 # Library Modules
 
-use lib qw(lib);
-use Net::NNTP;
+use lib qw(./lib ../lib);
+
+use Cwd;
 use DBI;
-use MIME::QuotedPrint;
+use Getopt::ArgvFile default=>1;
 use Getopt::Long;
 use IO::File;
 
-use CPAN::WWW::Testers::Generator::Article;
-use CPAN::WWW::Testers::Generator::Database;
+use CPAN::WWW::Testers::Generator;
 
 # -------------------------------------
 # Variables
 
-use constant DATABASE => './cpanstats.db';
-
-my $LOG = 'logs/cpanstats.log';
-
-my (%options,@exclude,@badnntps,%stats);
-
+my (%options,@exclude);
 
 # -------------------------------------
 # Program
 
 ##### INITIALISE #####
 
-GetOptions( \%options,
-	    "check|c",
-	    "id|i=i",
-	    "exclude|x=s" => \@exclude,
-            "database=s",
-	    "file=s",
+init_options();
+
+my $directory = $options{directory} || cwd();
+my $t = CPAN::WWW::Testers::Generator->new(
+    directory   => $directory,
+    logfile     => $directory . '/logs/cpanstats.log'
 );
-
-$options{database} ||= DATABASE;
-die "Database not found [$options{database}]\n"   unless(-f $options{database});
-
-my $dbi = CPAN::WWW::Testers::Generator::Database->new(database => $options{database});
-print STDERR "Cannot connect to database [$options{database}]\n"	unless($dbi);
 
 # GetOptions allows several different ways of passing multiple values, this
 # line is to ensure we have a list as we want it :)
 my %exclude = map {$_ => 1} split(/,/,join(',',@exclude));
+$options{exclude} = \%exclude;
 
 ##### MAIN #####
 
-process();
+my @list = get_list();
+$t->reparse(\%options,@list);
 
-
-##### THE SUBS #####
-
-sub process {
-    my $nntp = Net::NNTP->new("nntp.perl.org")
-    	|| die "Cannot connect to nntp.perl.org";
-    my($num, $first, $last) = $nntp->group("perl.cpan.testers");
-
-	my @list = get_list();
-	for my $id (@list) {
-        next    unless($id);
-		$dbi->do_query("DELETE from cpanstats WHERE id=$id")  unless($options{check});
-
-        _log("ID [$id]");
-        my $article = join "", @{$nntp->article($id) || []};
-
-        # no article for that id!
-        unless($article) {
-            _log(" ... no article\n");
-            die "No article returned [$id]\n";
-        }
-
-        my $object = CPAN::WWW::Testers::Generator::Article->new($article);
-
-        unless($object) {
-            _log(" ... bad parse\n");
-            next;
-        }
-
-        my (%fields,$error);
-        $fields{subject} = $object->subject;
-        $fields{from}    = $object->from;
-        _log(" [$fields{from}] $fields{subject}\n");
-        next    if($fields{subject} =~ /Re:/i);
-
-        unless($fields{subject} =~ /(CPAN|FAIL|PASS|NA|UNKNOWN)\s+/i) {
-            _log(" . [$id] ... bad subject\n");
-            next;
-        }
-
-        my $state = lc $1;
-
-        if($state eq 'cpan') {
-            if($object->parse_upload()) {
-                $fields{dist}      = $object->distribution;
-                $fields{version}   = $object->version;
-                $fields{from}	   = $object->author;
-            }
-
-            next    unless(valid_field($id, 'dist'     => $fields{dist})        || $exclude{dist});
-            next    unless(valid_field($id, 'version'  => $fields{version})     || $exclude{version});
-            next    unless(valid_field($id, 'author'   => $fields{from})        || $exclude{author});
-
-        } else {
-            if($object->parse_report()) {
-                $fields{dist}      = $object->distribution;
-                $fields{version}   = $object->version;
-                $fields{from}      = $object->from;
-                $fields{perl}      = $object->perl;
-                $fields{platform}  = $object->archname;
-                $fields{osname}    = $object->osname;
-                $fields{osvers}    = $object->osvers;
-
-                $fields{from}      =~ s/'/''/g; #'
-            }
-
-            next    unless(valid_field($id, 'dist'     => $fields{dist})        || $exclude{dist});
-            next    unless(valid_field($id, 'version'  => $fields{version})     || $exclude{version});
-            next    unless(valid_field($id, 'from'     => $fields{from})        || $exclude{from});
-            next    unless(valid_field($id, 'perl'     => $fields{perl})        || $exclude{perl});
-            next    unless(valid_field($id, 'platform' => $fields{platform})    || $exclude{platform});
-            next    unless(valid_field($id, 'osname'   => $fields{osname})      || $exclude{osname});
-            next    unless(valid_field($id, 'osvers'   => $fields{osvers})      || $exclude{osvers});
-        }
-
-        my $post = $object->postdate;
-        my $date = $object->date;
-        insert_report($id,$state,$post,(map {$fields{$_}} qw(from dist version platform perl osname osvers)),$date)    unless($options{check});
-    }
-}
-
-=item valid_field
-
-Check whether a value has been defined for the given field.
-
-=cut
-
-sub valid_field {
-    my ($id,$name,$value) = @_;
-    return 1    if(defined $value);
-    _log(" . [$id] ... missing field: $name\n");
-    return 0;
-}
-
-=item insert_report
-
-Insert the report into the database.
-
-=cut
-
-sub insert_report {
-    my @fields = @_;
-    $fields[$_] ||= 0   for(0);
-    $fields[$_] ||= ''  for(1,2,3,4,5,6,8,9,10);
-    $fields[$_] ||= '0' for(7);
-
-    my $id = shift @fields;
-    my $sql = 'INSERT INTO cpanstats VALUES (' . $id . ",'" . join("','",@fields) . "')";
-	$dbi->do_query($sql);
-}
+# -------------------------------------
+# Subroutines
 
 =item get_list
 
@@ -202,37 +88,73 @@ Returns the list of NNTP ids from the named file.
 =cut
 
 sub get_list {
-	my @list;
+    my @list;
 
     # we're only parsing one id
     return ($options{id}) if(defined $options{id});
 
     # we're parsing a list of ids
-	my $file = $options{file} || die "--file not specified";
-	die "file [$file] not found"	unless(-f $file);
+    my $file = $options{file} || die "--file not specified";
+    die "file [$file] not found"    unless(-f $file);
 
-	my $fh = IO::File->new($file,'r')	or die "Cannot read file [$file]: $!";
-	while(<$fh>) {
-		chomp;
-		my ($num) = (m/^(\d+)/);
-		push @list, $num;
-	}
-	$fh->close;
-	return @list;
+    my $fh = IO::File->new($file,'r')       or die "Cannot read file [$file]: $!";
+    while(<$fh>) {
+        chomp;
+        my ($num) = (m/^(\d+)/);
+        push @list, $num;
+    }
+    $fh->close;
+    return @list;
 }
 
-=item _log
+=item init_options
 
-Writes debug & information messages out appropriately
+Determine command line options and initialise any defaults.
 
 =cut
 
-sub _log {
-    print @_;
+sub init_options {
+    GetOptions( \%options,
+        'directory|d=s',
+        'check|c',
+        'localonly|l',
+        'id|i=i',
+        'file=s',
+        'exclude|x=s' => \@exclude,
+        'help|h',
+        'version|V'
+    );
 
-    my $fh = IO::File->new($LOG,'a+') or die "Cannot append to log file [$LOG]: $!\n";
-    print $fh @_;
-    $fh->close;
+    _help(1) if($options{help});
+    _help(0) if($options{version});
+}
+
+sub _help {
+    my $full = shift;
+
+    if($full) {
+        print <<HERE;
+
+Usage: $0 \\
+         [-d=<directory>] [--check|c] [--localonly|l] \\
+	 ( --id|i=<num> | --file=<file> ) \\
+	 [--exclude=<list>] [-h] [-V]
+
+  -d=<directory>    use named directory
+  -c                check only do not update
+  -l		    local only lookup
+  -i=<num>          named id to reparse
+  --file=<file>     file containing ids to reparse
+  --exclude=<list>  exclude fields from parsing
+  -h                this help screen
+  -V                program version
+
+HERE
+
+    }
+
+    print "$0 v$VERSION\n";
+    exit(0);
 }
 
 __END__
@@ -253,8 +175,12 @@ http://rt.cpan.org/Public/Dist/Display.html?Name=CPAN-WWW-Testers-Generator
 
 =head1 SEE ALSO
 
+L<CPAN::WWW::Testers>,
+L<CPAN::Testers::WWW::Statistics>
+
 F<http://www.cpantesters.org/>,
-F<http://stats.cpantesters.org/>
+F<http://stats.cpantesters.org/>,
+F<http://wiki.cpantesters.org/>
 
 =head1 AUTHOR
 
