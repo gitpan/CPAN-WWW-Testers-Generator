@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.05';
+my $VERSION = '0.06';
 
 #----------------------------------------------------------------------------
 
@@ -141,7 +141,7 @@ sub init_options {
     GetOptions( \%options,
         'database=s',
         'id|i=i',
-        'file=s'
+        'file=s',
         'help|h',
         'version|V'
     );
@@ -157,8 +157,7 @@ sub _help {
         print <<HERE;
 
 Usage: $0 \\
-         [--database=<db>] \\
-	 [ ( [--start=n] [--end=n] | --update=<file> ) ] \\
+         [--database=<db>] [--id=<num>] [--file=<file>] \\
 	 [-h] [-V]
 
   --database=<db>   use named database

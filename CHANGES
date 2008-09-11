@@ -1,5 +1,10 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.27	11/09/2008
+	- added 'grade' option to search in bin/cpanstats-select (v0.08)
+	- fixed help text in bin/cpanstats-update (v0.06)
+	- fixed test bug in 12generate.t (I can't count!)
+
 0.26	02/09/2008
 	- abstracted all database functionality out of Generator.pm into
 	  Database.pm, including database creation. All scripts updated too.

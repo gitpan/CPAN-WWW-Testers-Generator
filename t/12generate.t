@@ -121,7 +121,7 @@ SKIP: {
 ## Test we can reparse
 
 SKIP: {
-    skip "Test::MockObject required for testing", 12 if $nomock;
+    skip "Test::MockObject required for testing", 11 if $nomock;
 
     my $t = CPAN::WWW::Testers::Generator->new(
         directory   => $directory,
@@ -159,7 +159,7 @@ SKIP: {
 ## Test we don't store articles
 
 SKIP: {
-    skip "Test::MockObject required for testing", 11 if $nomock;
+    skip "Test::MockObject required for testing", 14 if $nomock;
 
     # set to not store articles
     my $t = CPAN::WWW::Testers::Generator->new(

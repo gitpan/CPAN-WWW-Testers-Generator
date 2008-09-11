@@ -121,7 +121,7 @@ sub init_options {
         'all|a=i',
         'delete|d=i',
         'database=s',
-        'file=s'
+        'file=s',
         'help|h',
         'version|V'
     );
