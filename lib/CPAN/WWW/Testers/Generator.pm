@@ -1,9 +1,10 @@
 package CPAN::WWW::Testers::Generator;
 
+use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.27';
+$VERSION = '0.28';
 
 #----------------------------------------------------------------------------
 # Library Modules
@@ -57,12 +58,20 @@ sub DESTROY {
 #----------------------------------------------------------------------------
 # Public Methods
 
-sub generate {
-    my $self = shift;
+sub _init {
+    my ($self,$nntp) = @_;
 
     $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
     $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
+    return  unless($nntp);
+
     $self->{nntp}  ||= $self->nntp_connect();
+}
+
+sub generate {
+    my $self = shift;
+
+    $self->_init(1);
 
     my $start = $self->_get_lastid() +1;
     my $end   = $self->{nntp_last};
@@ -97,8 +106,7 @@ sub generate {
 sub rebuild {
     my ($self,$start,$end) = @_;
 
-    $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
-    $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
+    $self->_init(0);
 
     $start ||= 1;
     $end   ||= $self->_get_lastid();
@@ -133,9 +141,8 @@ sub reparse {
     my ($self,$options,@ids) = @_;
     return  unless(@ids);
 
-    $self->{stats} ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->database);
-    $self->{arts}  ||= CPAN::WWW::Testers::Generator::Database->new(database => $self->articles);
-    $self->{nntp}  ||= $self->nntp_connect()   unless($options && $options->{localonly});
+    my $flag = ($options && $options->{localonly}) ? 0 : 1;
+    $self->_init($flag);
 
     my $last = $self->_get_lastid();
 
@@ -169,8 +176,8 @@ sub cleanup {
     my $id = $self->_get_lastid();
     return  unless($id);
 
-    my $sql = 'DELETE FROM articles WHERE id < ?';
-    $self->{arts}->do_query($sql,$id);
+    $self->{arts}->do_query('DELETE FROM articles WHERE id < ?',$id);
+    $self->{arts}->do_commit;
 }
 
 #----------------------------------------------------------------------------

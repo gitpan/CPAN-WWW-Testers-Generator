@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.18';
+my $VERSION = '0.19';
 
 #----------------------------------------------------------------------------
 
@@ -415,7 +415,8 @@ sub _help {
 Usage: $0 \\
          [-database=<db>] [-c] [-m] [-v] [-s] \\
          [--file=<file>] [--start=n] [--end=n] \\
-	 [--log=<file>] [-out=<file>] [-h] [-V]
+	 [--log=<file>] [-out=<file>] [-h] [-V] \\
+         [--localonly]
 
   --database=<db>   use a named database
   -m                check for missing entries

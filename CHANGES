@@ -1,5 +1,11 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.28	18/09/2008
+	- added SQLite pragma 'auto_vacuum' to database creation.
+	- created an _init function to generate db/nntp objects in one place
+	- add --localonly option to help screen in bin/cpanstats-verify (v0.19)
+	- fixed test script to correctly do cmp_ok :)
+
 0.27	11/09/2008
 	- added 'grade' option to search in bin/cpanstats-select (v0.08)
 	- fixed help text in bin/cpanstats-update (v0.06)

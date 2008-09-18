@@ -194,8 +194,8 @@ SKIP: {
     my $msize = -s $directory . '/articles.db';
     my $mcount = getCount($directory . '/articles.db');
 
-    cmp_ok($msize, 'le', $size,'.. db should be a smaller size');
-    cmp_ok($mcount, 'le', $count,'.. db should have fewer records');
+    cmp_ok($msize, '<=', $size,'.. db should be a smaller size');
+    cmp_ok($mcount, '<=', $count,'.. db should have fewer records');
     is($mcount,1,'.. should one be 1 record');
 }
 

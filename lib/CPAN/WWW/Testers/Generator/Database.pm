@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.27';
+$VERSION = '0.28';
 
 #----------------------------------------------------------------------------
 
@@ -185,6 +185,7 @@ sub _dbh_create {
 
     if($db =~ /cpanstats.db$/) {
         push @sql,
+            'PRAGMA auto_vacuum = 1',
             'CREATE TABLE cpanstats (
                           id            INTEGER PRIMARY KEY,
                           state         TEXT,
@@ -204,6 +205,7 @@ sub _dbh_create {
             'CREATE INDEX ixdate ON cpanstats (postdate)';
     } else {
         push @sql,
+            'PRAGMA auto_vacuum = 1',
             'CREATE TABLE articles (
                           id            INTEGER PRIMARY KEY,
                           article       TEXT)';

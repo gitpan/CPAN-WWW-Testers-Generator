@@ -1,9 +1,10 @@
 package CPAN::WWW::Testers::Generator::Article;
 
+use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.27';
+$VERSION = '0.28';
 
 #----------------------------------------------------------------------------
 # Library Modules
