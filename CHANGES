@@ -1,5 +1,9 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.29	19/09/2008
+	- ignore any uploads that are not in a supported archive format used
+	  for testing.
+
 0.28	18/09/2008
 	- added SQLite pragma 'auto_vacuum' to database creation.
 	- created an _init function to generate db/nntp objects in one place
