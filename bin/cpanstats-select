@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.08';
+my $VERSION = '0.09';
 
 #----------------------------------------------------------------------------
 
@@ -48,6 +48,7 @@ Specify the exact path to the cpanstats database if not ./cpanstats.db.
 use lib qw(./lib ../lib);
 
 use DBI;
+use Getopt::ArgvFile default=>1;
 use Getopt::Long;
 
 use CPAN::WWW::Testers::Generator::Database;
@@ -114,17 +115,17 @@ if(@where) {
 
 sub init_options {
     GetOptions( \%options,
-    'database=s',
-    'nntp|n=s',
-    'grade|g=s',
-    'distro|m=s',
-    'dist|d=s',
-    'distversion|x=s',
-    'platform|o=s',
-    'perl|p=s',
-    'tester|t=s',
-    'version|v=s',
-    'date|y=s',
+        'database=s',
+        'nntp|n=s',
+        'grade|g=s',
+        'distro|m=s',
+        'dist|d=s',
+        'distversion|x=s',
+        'platform|o=s',
+        'perl|p=s',
+        'tester|t=s',
+        'version|v=s',
+        'date|y=s',
         'help|h',
         'version|V'
     );

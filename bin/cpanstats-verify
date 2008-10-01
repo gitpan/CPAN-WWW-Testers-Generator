@@ -2,7 +2,7 @@
 use strict;
 $|++;
 
-my $VERSION = '0.19';
+my $VERSION = '0.20';
 
 #----------------------------------------------------------------------------
 
@@ -404,6 +404,21 @@ sub init_options {
 
     _help(1) if($options{help});
     _help(0) if($options{version});
+
+    unless($options{database} && -f $options{database}) {
+    	print "No database specified\n\n";
+	_help(1);
+    }
+
+    unless($options{log} && -f $options{log}) {
+    	print "No cpanstats.log file specified\n\n";
+	_help(1);
+    }
+
+    unless($options{out}) {
+    	print "No results output file specified\n\n";
+	_help(1);
+    }
 }
 
 sub _help {

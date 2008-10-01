@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.29';
+$VERSION = '0.30';
 
 #----------------------------------------------------------------------------
 # Library Modules
@@ -124,11 +124,11 @@ sub parse_upload {
     my $distvers = $1;
 
     # only record supported archives
-    return 0    if($distvers !~ /\.(?:(?:tar\.|t)(?:gz|bz2)|zip)/);
+    return 0    if($distvers !~ /\.(?:(?:tar\.|t)(?:gz|bz2)|zip)$/);
 
     # CPAN::DistnameInfo doesn't support .tar.bz2 files ... yet
-    $distvers =~ s/\.(?:tar\.|t)bz2//i;
-    $distvers .= '.tar.gz' unless $distvers =~ /\.(?:(?:tar\.|t)gz|zip)/i;
+    $distvers =~ s/\.(?:tar\.|t)bz2$//i;
+    $distvers .= '.tar.gz' unless $distvers =~ /\.(?:(?:tar\.|t)gz|zip)$/i;
 
     # CPAN::DistnameInfo doesn't support old form of uploads
     my @parts = split("/",$distvers);
