@@ -1,5 +1,11 @@
 Revision history for Perl module CPAN::WWW::Testers::Generator.
 
+0.31	29/04/2012
+	- ADVANCED WARNING
+	- - This distribution will be deleted shortly.
+	- - It is no longer used to create the CPAN Testers website.
+	- - Please see CPAN-Testers-Data-Generator.
+
 0.30	01/10/2008
 	- ensure upload pattern matching is for the end of the string.
 	- add more option validation in bin/cpanstats-verify (v0.20).

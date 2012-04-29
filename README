@@ -1,90 +1,53 @@
 NAME
-    CPAN::WWW::Testers::Generator - Download and summarize CPAN Testers data
-
-SYNOPSIS
-      % cpanstats
-      # ... wait patiently
-      # ... then use cpanstats.db, an SQLite database
+    CPAN::WWW::Testers::Generator - The pre-2009 CPAN Testers data manager codebase
 
 DESCRIPTION
-    This distribution was originally written by Leon Brocard to download and
-    summarize CPAN Testers data. However, much of the original code has been
-    rewritten to use the CPAN Testers Statistics database generation code. This
-    now means that all the CPAN Testers sites including the Reports site, the
-    Statistics site and the CPAN Dependencies site, can use the same database.
 
-    This module downloads articles from the cpan-testers newsgroup, generating or
-    updating an SQLite database containing all the most important information. You
-    can then query this database, or use CPAN::WWW::Testers to present it over the
-    web.
+    This distribution used to generate the CPAN Testers database before 2009.
 
-    A good example query for Acme-Colour would be:
+CPAN TESTERS
 
-      SELECT version, status, count(*) FROM reports WHERE
-      distribution = "Acme-Colour" group by version, status;
-
-    To create a database from scratch can take several hours, as there are now over
-    1.5 million articles in the newgroup. As such updating from a known copy of the
-    database is much more advisable. If you don't want to generate the database
-    yourself, you can obtain the latest official copy (compressed with gzip) at
-    http://devel.cpantesters.org/cpanstats.db.gz
-
-INTERFACE
-  The Constructor
-    * new
-        Instatiates the object CPAN::WWW::Testers::Generator.
-
-  Methods
-    * logfile
-
-        Accessor to set/get where the logging information is to be kept. Note 
-	that if this not set, no logging occurs.
-
-    * database
-
-        Accessor to set/get the database full path.
-
-    * directory
-
-        Accessor to set/get the directory where the database is to be created.
-
-    * generate
-
-        Starting from the last recorded article, retrieves all the more recent
-	articles from the NNTP server, parsing each and recording the articles 
-	that either upload announcements or reports.
-
-    * insert_article
-
-        Inserts the components of a parsed article into the database.
-
-DATABASE SCHEMA
-
-    The database schema is very straightforward, one main table with several
-    index tables to speed up searches. The main table is as below:
-
-      +--------------------------------+
-      | cpanstats                      |
-      +----------+---------------------+
-      | id       | INTEGER PRIMARY KEY |
-      | state    | TEXT                |
-      | postdate | TEXT                |
-      | tester   | TEXT                |
-      | dist     | TEXT                |
-      | version  | TEXT                |
-      | platform | TEXT                |
-      | perl     | TEXT                |
-      | osname   | TEXT                |
-      | osvers   | TEXT                |
-      | archname | TEXT                |
-      +----------+---------------------+
-
-HISTORY
-    The CPAN testers was conceived back in May 1998 by Graham Barr and Chris 
-    Nandor as a way to provide multi-platform testing for modules. Today there 
-    are over 1.5 million tester reports and more than 100 testers each month
-    giving valuable feedback for users and authors alike.
+    The CPAN Testers project was conceived back in May 1998 by Graham Barr and 
+    Chris Nandor as a way to provide multi-platform testing for modules uploaded
+    to CPAN. Today there are over 20 million test reports and more than 100 
+    testers regularly submitting reports each month, giving valuable feedback 
+    for users and authors alike.
       
+    The objective of the group is to test as many of the distributions 
+    available on CPAN as possible, on as many platforms as possible, with a 
+    variety of perl interpreters. The ultimate goal is to improve the 
+    portability of the distributions on CPAN, and provide good feedback to the 
+    authors.
+
+    This distribution was originally written by Leon Brocard to download and
+    summarize CPAN Testers data. However, since 2008, the codebase has been
+    redesigned by Barbie, firstly to use the cpanstats database, and secondly
+    to retrieve data from the Metabase API.
+
+    Following the complete redesign of the tools in 2009, this distribution 
+    and the tools used were no longer required.
+
+    For the current set of releases for the CPAN Testers family of websites,
+    please see:
+
+    * CPAN-Testers-WWW-Reports
+    * CPAN-Testers-WWW-Statistics
+    * CPAN-Testers-WWW-Wiki
+    * CPAN-Testers-WWW-Blog
+
+    ADVANCED WARNING - ADVANCED WARNING - ADVANCED WARNING - ADVANCED WARNING
+
+    This distribution will soon be deleted from CPAN. It is no longer
+    applicable for the building of the CPAN Testers websites, and no longer
+    maintained.
+
+SEE ALSO
+
+    * CPAN-Testers-WWW-Reports     - http://www.cpantesters.org
+    * CPAN-Testers-WWW-Statistics  - http://stats.cpantesters.org
+    * CPAN-Testers-WWW-Wiki        - http://wiki.cpantesters.org
+    * CPAN-Testers-WWW-Blog        - http://blog.cpantesters.org
+
 BECOME A TESTER
     The objective of the CPAN Testers is to test as many of the distributions 
     on CPAN as possible, on as many platforms as possible. The ultimate goal is
@@ -109,7 +72,7 @@ BECOME A TESTER
 
 AUTHOR
     Original author:    Leon Brocard <acme@astray.com>   (C) 2002-2008
-    Current maintainer: Barbie       <barbie@cpan.org>   (C) 2008
+    Current maintainer: Barbie       <barbie@cpan.org>   (C) 2008-2012
 
 LICENSE
     This code is distributed under the same license as Perl.

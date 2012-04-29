@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:                     CPAN-WWW-Testers-Generator
-version:                  0.30
-abstract:                 Download and summarize CPAN Testers data
+version:                  0.31
+abstract:                 The pre-2009 CPAN Testers data manager codebase
 author:
   - Barbie <barbie@cpan.org>
   - Leon Brocard <leon@astray.com>
@@ -11,43 +11,23 @@ distribution_type:        module
 installdirs:              site
 
 requires:
-  Cwd:                    0
-  CPAN::DistnameInfo:     0
-  Class::Accessor::Fast:  0
-  DBD::SQLite:            1.07
-  DBI:                    0
-  Email::Simple:          0
-  File::Basename:         0
-  File::Path:             0
-  Getopt::Long:           0
-  MIME::Base64:           0
-  MIME::QuotedPrint:      0
-  Net::NNTP:              0
-  version:                0
+  perl:                   5.006
 recommends:
   Test::More:             0.70
-  Test::MockObject:       0
   Test::Pod:              1.00
   Test::Pod::Coverage:    0.08
   Test::CPAN::Meta:       0.12
 build_requires:
-  Test::More:             0.01
+  Test::More:             0.70
 
 provides:
   CPAN::WWW::Testers::Generator:
     file:     lib/CPAN/WWW/Testers/Generator.pm
-    version:  0.30
-  CPAN::WWW::Testers::Generator::Article:
-    file:     lib/CPAN/WWW/Testers/Generator/Article.pm
-    version:  0.30
-  CPAN::WWW::Testers::Generator::Database:
-    file:     lib/CPAN/WWW/Testers/Generator/Database.pm
-    version:  0.30
+    version:  0.31
 
 no_index:
   directory:
     - t
-    - examples
 
 resources:
   license:    http://dev.perl.org/licenses/
